@@ -1,0 +1,8 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Base application theme that uses Material 3 defaults from the library. Do not redefine color tokens here. -->
+    <style name="Base.Theme.ReflectionExplorer" parent="Theme.Material3Expressive.DayNight.NoActionBar">
+        <!-- Intentionally minimal: use default Material 3 color roles provided by the library/dynamic colors. -->
+    </style>
+
+    <style name="Theme.ReflectionExplorer" parent="Base.Theme.ReflectionExplorer" />
+</resources>
