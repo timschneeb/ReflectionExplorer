@@ -1,4 +1,4 @@
-package me.timschneeberger.reflectionexplorer
+package me.timschneeberger.reflectionexplorer.utils
 
 import java.lang.reflect.Field
 import java.lang.reflect.Method

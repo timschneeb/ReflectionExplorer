@@ -1,4 +1,4 @@
-package me.timschneeberger.reflectionexplorer
+package me.timschneeberger.reflectionexplorer.adapter
 
 import android.annotation.SuppressLint
 import android.view.LayoutInflater
@@ -6,11 +6,20 @@ import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
+import me.timschneeberger.reflectionexplorer.utils.ClassHeaderInfo
+import me.timschneeberger.reflectionexplorer.utils.ElementInfo
+import me.timschneeberger.reflectionexplorer.utils.FieldInfo
+import me.timschneeberger.reflectionexplorer.utils.MapEntryInfo
+import me.timschneeberger.reflectionexplorer.utils.MemberInfo
+import me.timschneeberger.reflectionexplorer.utils.MethodInfo
+import me.timschneeberger.reflectionexplorer.R
+import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberHeaderBinding
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
 import me.timschneeberger.reflectionexplorer.utils.getFieldDrawable
 import me.timschneeberger.reflectionexplorer.utils.getMethodDrawable
+import java.lang.reflect.Array
 
 private const val TYPE_HEADER = 0
 private const val TYPE_MEMBER = 1
@@ -83,9 +92,9 @@ class MembersAdapter(
             else -> {
                 val cls = v.javaClass
                 if (cls.isArray) {
-                    val len = java.lang.reflect.Array.getLength(v)
+                    val len = Array.getLength(v)
                     val max = len.coerceAtMost(3)
-                    val preview = (0 until max).map { i -> java.lang.reflect.Array.get(v, i)?.toString() ?: "null" }
+                    val preview = (0 until max).map { i -> Array.get(v, i)?.toString() ?: "null" }
                     "size=$len [${preview.joinToString(", ")}]"
                 } else {
                     v.toString().let { s -> if (s.length > 120) "${s.take(120)}... (len=${s.length})" else s }

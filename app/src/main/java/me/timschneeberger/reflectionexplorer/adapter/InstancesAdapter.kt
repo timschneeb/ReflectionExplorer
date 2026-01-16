@@ -1,8 +1,9 @@
-package me.timschneeberger.reflectionexplorer
+package me.timschneeberger.reflectionexplorer.adapter
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.databinding.ItemInstanceBinding
 
 class InstancesAdapter(

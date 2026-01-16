@@ -1,13 +1,26 @@
-package me.timschneeberger.reflectionexplorer
+package me.timschneeberger.reflectionexplorer.fragment
 
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
+import me.timschneeberger.reflectionexplorer.InspectorViewModel
+import me.timschneeberger.reflectionexplorer.MainActivity
+import me.timschneeberger.reflectionexplorer.adapter.BreadcrumbAdapter
+import me.timschneeberger.reflectionexplorer.adapter.MembersAdapter
 import me.timschneeberger.reflectionexplorer.databinding.FragmentInspectorBinding
+import me.timschneeberger.reflectionexplorer.utils.ClassHeaderInfo
+import me.timschneeberger.reflectionexplorer.utils.ElementInfo
+import me.timschneeberger.reflectionexplorer.utils.FieldInfo
+import me.timschneeberger.reflectionexplorer.utils.MapEntryInfo
+import me.timschneeberger.reflectionexplorer.utils.MethodInfo
+import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector
+import java.lang.reflect.Array
 
 class InspectorFragment : Fragment() {
     private var instance: Any? = null
@@ -45,7 +58,7 @@ class InspectorFragment : Fragment() {
                 else -> {
                     val cls = instVal?.javaClass
                     when {
-                        cls?.isArray == true -> { text = "Array: size=${java.lang.reflect.Array.getLength(instVal!!)}"; visibility = View.VISIBLE }
+                        cls?.isArray == true -> { text = "Array: size=${Array.getLength(instVal!!)}"; visibility = View.VISIBLE }
                         instVal is Map<*, *> -> { text = "Map: size=${instVal.size}"; visibility = View.VISIBLE }
                         else -> visibility = View.GONE
                     }
@@ -63,7 +76,8 @@ class InspectorFragment : Fragment() {
                 is MethodInfo -> activity?.onInvokeMethod(inst, member, binding.detailsText)
                 is ElementInfo -> activity?.onInspectElement(member.value, binding.detailsText)
                 is MapEntryInfo -> activity?.onInspectElement(member.value, binding.detailsText)
-                is ClassHeaderInfo -> { /* no-op: adapter handles expand/collapse */ }
+                is ClassHeaderInfo -> { /* no-op: adapter handles expand/collapse */
+                }
             }
         }
 
@@ -72,8 +86,8 @@ class InspectorFragment : Fragment() {
             adapter = membersAdapter
         }
 
-        viewLifecycleOwner.lifecycle.addObserver(object : androidx.lifecycle.DefaultLifecycleObserver {
-            override fun onResume(owner: androidx.lifecycle.LifecycleOwner) {
+        viewLifecycleOwner.lifecycle.addObserver(object : DefaultLifecycleObserver {
+            override fun onResume(owner: LifecycleOwner) {
                 super.onResume(owner)
                 membersAdapter.update(ReflectionInspector.listMembers(inst))
             }

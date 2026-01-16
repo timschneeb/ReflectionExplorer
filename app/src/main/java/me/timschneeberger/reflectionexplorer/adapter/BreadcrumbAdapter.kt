@@ -1,4 +1,4 @@
-package me.timschneeberger.reflectionexplorer
+package me.timschneeberger.reflectionexplorer.adapter
 
 import android.view.LayoutInflater
 import android.view.ViewGroup

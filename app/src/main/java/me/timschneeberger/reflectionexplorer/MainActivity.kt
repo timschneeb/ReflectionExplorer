@@ -18,6 +18,11 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
 import me.timschneeberger.reflectionexplorer.databinding.ActivityMainBinding
+import me.timschneeberger.reflectionexplorer.fragment.InspectorFragment
+import me.timschneeberger.reflectionexplorer.fragment.InstancesFragment
+import me.timschneeberger.reflectionexplorer.utils.FieldInfo
+import me.timschneeberger.reflectionexplorer.utils.MethodInfo
+import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 
