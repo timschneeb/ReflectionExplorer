@@ -135,6 +135,8 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
+        // TODO: dialog has no horizontal margin. does not fit with material 3 dialog!!
+
         val layout = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
         val inputViews = mutableListOf<View>()
         val chosenElementClasses = MutableList<Class<*>?>(params.size) { null }
@@ -206,6 +208,7 @@ class MainActivity : AppCompatActivity() {
                     val choice = typeOptions[position]
                     if (choice == "Custom...") {
                         val inputClass = TextInputEditText(ctx)
+                        // TODO: dialog has no horizontal margin. does not fit with material 3 dialog!!
                         MaterialAlertDialogBuilder(ctx)
                             .setTitle("Enter element class (e.g. java.lang.Integer)")
                             .setView(inputClass)
@@ -306,7 +309,10 @@ class MainActivity : AppCompatActivity() {
         MaterialAlertDialogBuilder(ctx)
             .setTitle("Invoke ${method.name}")
             .setView(layout)
-            .setNeutralButton("Defaults") { _, _ -> fillDefaults() }
+            .setNeutralButton("Defaults") { _, _ ->
+                fillDefaults()
+                // TODO keep dialog open!
+            }
             .setPositiveButton("Invoke") { _, _ ->
                 try {
                     val args = params.mapIndexed { i, t ->
@@ -328,77 +334,86 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun parseValue(text: String, type: Class<*>, genericType: Type? = null, elementClass: Class<*>? = null): Any? {
-        if (type == String::class.java) return text
-        if (type == Int::class.java || type == Integer.TYPE) return text.toIntOrNull() ?: 0
-        if (type == Long::class.java || type == java.lang.Long.TYPE) return text.toLongOrNull() ?: 0L
-        if (type == Boolean::class.java || type == java.lang.Boolean.TYPE) return when (text.lowercase()) { "true" -> true; else -> false }
-        if (type == Double::class.java || type == java.lang.Double.TYPE) return text.toDoubleOrNull() ?: 0.0
-        // Arrays: syntax [a,b,c]
-        if (type.isArray) {
-            val base = type.componentType ?: elementClass
-            if (base != null) {
-                val content = text.trim()
-                if (content.startsWith("[") && content.endsWith("]")) {
-                    val inner = content.substring(1, content.length - 1)
-                    val parts = if (inner.isBlank()) emptyList() else inner.split(",").map { it.trim() }
-                    val arr = java.lang.reflect.Array.newInstance(base, parts.size)
-                    for (i in parts.indices) {
-                        java.lang.reflect.Array.set(arr, i, parseValue(parts[i], base, null, null))
-                    }
-                    return arr
-                }
-            }
-        }
-        // Collections: try List or Set via simple parsing; use genericType or elementClass to infer element type where possible
-        if (java.util.List::class.java.isAssignableFrom(type) || java.util.Collection::class.java.isAssignableFrom(type)) {
-            val content = text.trim()
-            if (content.startsWith("[") && content.endsWith("]")) {
-                val inner = content.substring(1, content.length - 1)
-                val parts = if (inner.isBlank()) emptyList() else inner.split(",").map { it.trim() }
-                val elementCls: Class<*>? = elementClass ?: when (genericType) {
-                    is ParameterizedType -> genericType.actualTypeArguments.getOrNull(0) as? Class<*>
-                    else -> null
-                }
-                val list = ArrayList<Any?>()
-                for (p in parts) {
-                    if (elementCls != null) list.add(parseValue(p, elementCls, null, null)) else list.add(p)
-                }
-                return list
-            }
-        }
-        // Maps: syntax {k:v,k2:v2} (keys always strings; value type may be inferred or chosen)
-        if (java.util.Map::class.java.isAssignableFrom(type)) {
-            val content = text.trim()
-            if (content.startsWith("{") && content.endsWith("}")) {
-                val inner = content.substring(1, content.length - 1)
-                val map = mutableMapOf<String, Any?>()
-                val valueCls: Class<*>? = elementClass ?: when (genericType) {
-                    is ParameterizedType -> genericType.actualTypeArguments.getOrNull(1) as? Class<*>
-                    else -> null
-                }
-                if (inner.isNotBlank()) {
-                    inner.split(",").map { it.trim() }.forEach { pair ->
-                        val kv = pair.split(":", limit = 2).map { it.trim() }
-                        if (kv.size == 2) {
-                            val key = kv[0]
-                            val rawVal = kv[1]
-                            val v = if (valueCls != null) parseValue(rawVal, valueCls, null, null) else rawVal
-                            map[key] = v
-                        }
-                    }
-                }
-                return map
-            }
-        }
-        // Fallback: attempt boxed Number parsing
-        if (Number::class.java.isAssignableFrom(type)) {
+        // Helper: try primitive/boxed types first
+        fun parsePrimitive(): Any? {
             return when (type) {
-                Integer::class.java -> text.toIntOrNull() ?: 0
-                java.lang.Long::class.java -> text.toLongOrNull() ?: 0L
-                java.lang.Double::class.java -> text.toDoubleOrNull() ?: 0.0
+                String::class.java -> text
+                Int::class.java, Integer.TYPE -> text.toIntOrNull() ?: 0
+                Long::class.java, java.lang.Long.TYPE -> text.toLongOrNull() ?: 0L
+                Boolean::class.java, java.lang.Boolean.TYPE -> when (text.lowercase()) { "true" -> true; else -> false }
+                Double::class.java, java.lang.Double.TYPE -> text.toDoubleOrNull() ?: 0.0
                 else -> null
             }
         }
+
+        fun parseArrayValue(): Any? {
+            val base = type.componentType ?: elementClass ?: return null
+            val content = text.trim()
+            if (!content.startsWith("[") || !content.endsWith("]")) return null
+            val inner = content.substring(1, content.length - 1)
+            val parts = if (inner.isBlank()) emptyList() else inner.split(",").map { it.trim() }
+            val arr = java.lang.reflect.Array.newInstance(base, parts.size)
+            for (i in parts.indices) {
+                java.lang.reflect.Array.set(arr, i, parseValue(parts[i], base, null, null))
+            }
+            return arr
+        }
+
+        fun parseCollectionValue(): Any? {
+            val content = text.trim()
+            if (!content.startsWith("[") || !content.endsWith("]")) return null
+            val inner = content.substring(1, content.length - 1)
+            val parts = if (inner.isBlank()) emptyList() else inner.split(",").map { it.trim() }
+            val elementCls: Class<*>? = elementClass ?: when (genericType) {
+                is ParameterizedType -> (genericType.actualTypeArguments.getOrNull(0) as? Class<*>)
+                else -> null
+            }
+            val list = ArrayList<Any?>()
+            for (p in parts) {
+                if (elementCls != null) list.add(parseValue(p, elementCls, null, null)) else list.add(p)
+            }
+            return list
+        }
+
+        fun parseMapValue(): Any? {
+            val content = text.trim()
+            if (!content.startsWith("{") || !content.endsWith("}")) return null
+            val inner = content.substring(1, content.length - 1)
+            val map = mutableMapOf<String, Any?>()
+            val valueCls: Class<*>? = elementClass ?: when (genericType) {
+                is ParameterizedType -> (genericType.actualTypeArguments.getOrNull(1) as? Class<*>)
+                else -> null
+            }
+            if (inner.isNotBlank()) {
+                inner.split(",").map { it.trim() }.forEach { pair ->
+                    val kv = pair.split(":", limit = 2).map { it.trim() }
+                    if (kv.size == 2) {
+                        val key = kv[0]
+                        val rawVal = kv[1]
+                        val v = if (valueCls != null) parseValue(rawVal, valueCls, null, null) else rawVal
+                        map[key] = v
+                    }
+                }
+            }
+            return map
+        }
+
+        // Try primitive types quickly
+        parsePrimitive()?.let { return it }
+
+        // Arrays
+        if (type.isArray) return parseArrayValue()
+
+        // Collections
+        if (java.util.List::class.java.isAssignableFrom(type) || java.util.Collection::class.java.isAssignableFrom(type)) {
+            return parseCollectionValue()
+        }
+
+        // Maps
+        if (java.util.Map::class.java.isAssignableFrom(type)) {
+            return parseMapValue()
+        }
+
         // Fallback: not supported complex parsing
         return null
     }
