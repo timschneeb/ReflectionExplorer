@@ -111,31 +111,41 @@ class MembersAdapter(
                 }
                 val s = v.toString()
                 return if (s.length > 120) "${s.substring(0, 120)}... (len=${s.length})" else s
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 return "<error>"
             }
         }
 
-        if (holder is VH){
-            // set item background according to position (first/last/single/middle)
+        // apply rounded background only within header-separated groups
+        if (holder is VH) {
             val container = holder.itemView.findViewById<View>(R.id.member_container)
-            val visibleCount = visibleItems.count { it !is ClassHeaderInfo }
-            // compute index among members (skip headers)
-            var memberIndex = -1
-            var seen = -1
-            for (i in 0 until visibleItems.size) {
-                if (visibleItems[i] !is ClassHeaderInfo) {
-                    seen++
-                    if (i == position) { memberIndex = seen; break }
+            // scan backward for the previous header
+            var headerIndex = -1
+            for (i in position - 1 downTo 0) {
+                if (visibleItems[i] is ClassHeaderInfo) { headerIndex = i; break }
+            }
+            if (headerIndex == -1) {
+                // not in a header group -> plain background
+                container?.setBackgroundResource(R.drawable.bg_member_single)
+            } else {
+                // compute group bounds: start after header, end at next header or end
+                val start = headerIndex + 1
+                var end = start
+                while (end < visibleItems.size && visibleItems[end] !is ClassHeaderInfo) end++
+                val count = end - start
+                if (count <= 0) {
+                    container?.setBackgroundResource(R.drawable.bg_member_single)
+                } else {
+                    val memberIndex = position - start
+                    val bgRes = when {
+                        count <= 1 -> R.drawable.bg_member_single
+                        memberIndex == 0 -> R.drawable.bg_member_top
+                        memberIndex == count - 1 -> R.drawable.bg_member_bottom
+                        else -> R.drawable.bg_member_middle
+                    }
+                    container?.setBackgroundResource(bgRes)
                 }
             }
-            val bgRes = when {
-                visibleCount <= 1 -> R.drawable.bg_member_single
-                memberIndex == 0 -> R.drawable.bg_member_top
-                memberIndex == visibleCount - 1 -> R.drawable.bg_member_bottom
-                else -> R.drawable.bg_member_middle
-            }
-            container?.setBackgroundResource(bgRes)
         }
 
         when (item) {
@@ -167,7 +177,7 @@ class MembersAdapter(
                     val typeName = item.field.type.simpleName
                     val preview = formatPreview(v)
                     "$typeName -> $preview"
-                } catch (e: Exception) { "<error>" }
+                } catch (_: Exception) { "<error>" }
                 hv.subtitle.text = valueDesc
                 // choose icon by field type/value (use overlays for final/static)
                 val fType = item.field.type
