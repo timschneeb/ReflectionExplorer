@@ -1,34 +1,27 @@
 package me.timschneeberger.reflectionexplorer
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import me.timschneeberger.reflectionexplorer.databinding.ItemInstanceBinding
 
 class InstancesAdapter(
     private val items: List<Any>,
     private val onClick: (Any) -> Unit
 ) : RecyclerView.Adapter<InstancesAdapter.VH>() {
 
-    class VH(view: View) : RecyclerView.ViewHolder(view) {
-        val title: TextView = view.findViewById(R.id.item_title)
-        val subtitle: TextView = view.findViewById(R.id.item_subtitle)
-        val icon: android.widget.ImageView = view.findViewById(R.id.item_icon)
-    }
+    class VH(val binding: ItemInstanceBinding) : RecyclerView.ViewHolder(binding.root)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val view = LayoutInflater.from(parent.context)
-            .inflate(R.layout.item_instance, parent, false)
-        return VH(view)
+        return VH(ItemInstanceBinding.inflate(LayoutInflater.from(parent.context), parent, false))
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = items[position]
-        holder.title.text = item::class.java.simpleName
-        holder.subtitle.text = item.toString()
-        holder.icon.setImageResource(R.drawable.ic_class)
-        holder.itemView.setOnClickListener { onClick(item) }
+        holder.binding.itemTitle.text = item::class.java.simpleName
+        holder.binding.itemSubtitle.text = item.toString()
+        holder.binding.itemIcon.setImageResource(R.drawable.ic_class)
+        holder.binding.root.setOnClickListener { onClick(item) }
     }
 
     override fun getItemCount(): Int = items.size

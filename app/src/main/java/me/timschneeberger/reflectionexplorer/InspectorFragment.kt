@@ -4,15 +4,14 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
+import me.timschneeberger.reflectionexplorer.databinding.FragmentInspectorBinding
 
 class InspectorFragment : Fragment() {
     private var instance: Any? = null
     private var bcAdapter: BreadcrumbAdapter? = null
-    private var breadcrumbsRv: RecyclerView? = null
+    private lateinit var binding: FragmentInspectorBinding
 
     companion object {
         fun newInstance(instance: Any): InspectorFragment {
@@ -23,27 +22,29 @@ class InspectorFragment : Fragment() {
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View? {
-        val root = inflater.inflate(R.layout.fragment_inspector, container, false)
-        breadcrumbsRv = root.findViewById(R.id.breadcrumbs)
-        val membersRv = root.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.members_list)
-        val detailsText = root.findViewById<TextView>(R.id.details_text)
+        binding = FragmentInspectorBinding.inflate(inflater, container, false)
+        val root = binding.root
 
-        breadcrumbsRv?.layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
+        val breadcrumbsRv = binding.breadcrumbs
+        val membersRv = binding.membersList
+        val detailsText = binding.detailsText
+
+        breadcrumbsRv.layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
         val activity = activity as? MainActivity
         val trail = activity?.getInspectionTrail() ?: listOf(instance?.javaClass?.simpleName ?: "root")
         bcAdapter = BreadcrumbAdapter(trail, trail.size - 1) { idx ->
             // fetch latest trail from activity (may have changed) and update selection, then pop
             val liveTrail = (activity?.getInspectionTrail() ?: trail)
             bcAdapter?.update(liveTrail, idx)
-            breadcrumbsRv?.post { breadcrumbsRv?.smoothScrollToPosition(idx) }
+            breadcrumbsRv.post { breadcrumbsRv.smoothScrollToPosition(idx) }
             activity?.popToLevel(idx)
         }
-        breadcrumbsRv?.adapter = bcAdapter
+        breadcrumbsRv.adapter = bcAdapter
         // auto-scroll to end
-        breadcrumbsRv?.post { breadcrumbsRv?.smoothScrollToPosition((bcAdapter?.itemCount ?: 1) - 1) }
+        breadcrumbsRv.post { breadcrumbsRv.smoothScrollToPosition((bcAdapter?.itemCount ?: 1) - 1) }
 
         // show collection/array/map size info
-        val infoChip = root.findViewById<com.google.android.material.chip.Chip>(R.id.collection_info_chip)
+        val infoChip = binding.collectionInfoChip
         when (val instVal = instance) {
             is Collection<*> -> {
                 infoChip.text = "Collection: size=${instVal.size}"
@@ -97,15 +98,14 @@ class InspectorFragment : Fragment() {
         val trail = activity?.getInspectionTrail()
         if (trail != null) {
             bcAdapter?.update(trail, trail.size - 1)
-            breadcrumbsRv?.post { breadcrumbsRv?.smoothScrollToPosition((bcAdapter?.itemCount ?: 1) - 1) }
+            binding.breadcrumbs.post { binding.breadcrumbs.smoothScrollToPosition((bcAdapter?.itemCount ?: 1) - 1) }
         }
     }
-
     // Called by activity when back stack changes so fragment can refresh breadcrumb UI immediately
     fun refreshBreadcrumb() {
         val activity = activity as? MainActivity ?: return
         val trail = activity.getInspectionTrail()
         bcAdapter?.update(trail, trail.size - 1)
-        breadcrumbsRv?.post { breadcrumbsRv?.smoothScrollToPosition((bcAdapter?.itemCount ?: 1) - 1) }
+        binding.breadcrumbs.post { binding.breadcrumbs.smoothScrollToPosition((bcAdapter?.itemCount ?: 1) - 1) }
     }
 }

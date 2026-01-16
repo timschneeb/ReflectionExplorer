@@ -1,10 +1,10 @@
 package me.timschneeberger.reflectionexplorer
 
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
+import me.timschneeberger.reflectionexplorer.databinding.ItemBreadcrumbBinding
 
 class BreadcrumbAdapter(
     private var items: List<String>,
@@ -12,27 +12,22 @@ class BreadcrumbAdapter(
     private val onClick: (Int) -> Unit
 ) : RecyclerView.Adapter<BreadcrumbAdapter.VH>() {
 
-    class VH(view: View) : RecyclerView.ViewHolder(view) {
-        val chip: com.google.android.material.chip.Chip = view.findViewById(R.id.breadcrumb_chip)
-    }
+    class VH(val binding: ItemBreadcrumbBinding) : RecyclerView.ViewHolder(binding.root)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        val view = LayoutInflater.from(parent.context).inflate(R.layout.item_breadcrumb, parent, false)
-        return VH(view)
+        val binding = ItemBreadcrumbBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        return VH(binding)
     }
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val label = items.getOrNull(position) ?: ""
-        val display = if (position < items.size - 1) "$label ›" else label
-        holder.chip.text = display
-        // selected chip uses checkable style
-        holder.chip.isCheckable = true
-        holder.chip.isChecked = position == selectedIndex
-        holder.chip.isClickable = true
-        holder.chip.setOnCheckedChangeListener { _, _ ->
+        holder.binding.breadcrumbChip.text = if (position < items.size - 1) "$label ›" else label
+        holder.binding.breadcrumbChip.isCheckable = true
+        holder.binding.breadcrumbChip.isChecked = position == selectedIndex
+        holder.binding.breadcrumbChip.isClickable = true
+        holder.binding.breadcrumbChip.setOnCheckedChangeListener { _, _ ->
             if (position == selectedIndex)
-                holder.chip.isChecked = true // cannot uncheck the selected chip
-
+                holder.binding.breadcrumbChip.isChecked = true
             onClick(position)
         }
     }

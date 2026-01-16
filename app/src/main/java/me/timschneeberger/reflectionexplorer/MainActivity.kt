@@ -18,22 +18,22 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
+import me.timschneeberger.reflectionexplorer.databinding.ActivityMainBinding
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 
 class MainActivity : AppCompatActivity() {
     private val inspectionStack = mutableListOf<Any>()
+    private lateinit var binding: ActivityMainBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setContentView(R.layout.activity_main)
-        // Apply window insets to toolbar and container so toolbar does not overlap status bar
-        val content = findViewById<View>(android.R.id.content)
-        val toolbarView = findViewById<androidx.appcompat.widget.Toolbar>(R.id.toolbar)
-        val containerView = findViewById<FrameLayout>(R.id.container)
 
-        ViewCompat.setOnApplyWindowInsetsListener(toolbarView) { v, windowInsets ->
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.toolbar) { v, windowInsets ->
             val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
             // Apply the insets as a margin to the view. This solution sets
             // only the bottom, left, and right dimensions, but you can apply whichever
@@ -60,7 +60,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // use toolbarView found above
-        setSupportActionBar(toolbarView)
+        setSupportActionBar(binding.toolbar)
         supportFragmentManager.addOnBackStackChangedListener {
             val canGoBack = supportFragmentManager.backStackEntryCount > 0
             supportActionBar?.setDisplayHomeAsUpEnabled(canGoBack)
@@ -75,7 +75,7 @@ class MainActivity : AppCompatActivity() {
                 current?.refreshBreadcrumb()
             }
          }
-        toolbarView.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
+        binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
     }
 
     private fun openInspectorFor(instance: Any) {
@@ -256,7 +256,7 @@ class MainActivity : AppCompatActivity() {
                                     val cls = Class.forName(fqcn)
                                     chosenElementClasses[i] = cls
                                 } catch (_: Exception) {
-                                    com.google.android.material.snackbar.Snackbar.make(findViewById(android.R.id.content), "Could not load $fqcn, using String", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
+                                    com.google.android.material.snackbar.Snackbar.make(binding.root, "Could not load $fqcn, using String", com.google.android.material.snackbar.Snackbar.LENGTH_SHORT).show()
                                     chosenElementClasses[i] = String::class.java
                                 }
                                 updatePreview()

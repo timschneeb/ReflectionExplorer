@@ -10,6 +10,8 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
+import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
+import me.timschneeberger.reflectionexplorer.databinding.ItemMemberHeaderBinding
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
@@ -32,15 +34,9 @@ class MembersAdapter(
         rebuildVisible()
     }
 
-    class VH(view: View) : RecyclerView.ViewHolder(view) {
-        val title: TextView = view.findViewById(R.id.member_title)
-        val subtitle: TextView = view.findViewById(R.id.member_subtitle)
-        val icon: android.widget.ImageView = view.findViewById(R.id.member_icon)
-    }
+    class VH(val binding: ItemMemberBinding) : RecyclerView.ViewHolder(binding.root)
 
-    class HeaderVH(view: View) : RecyclerView.ViewHolder(view) {
-        val title: TextView = view.findViewById(R.id.header_title)
-    }
+    class HeaderVH(val binding: ItemMemberHeaderBinding) : RecyclerView.ViewHolder(binding.root)
 
     private fun rebuildVisible() {
         visibleItems.clear()
@@ -71,11 +67,11 @@ class MembersAdapter(
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
         return if (viewType == TYPE_HEADER) {
-            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_member_header, parent, false)
-            HeaderVH(view)
+            val binding = ItemMemberHeaderBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+            HeaderVH(binding)
         } else {
-            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_member, parent, false)
-            VH(view)
+            val binding = ItemMemberBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+            VH(binding)
         }
     }
 
@@ -119,7 +115,7 @@ class MembersAdapter(
 
         // apply rounded background only within header-separated groups
         if (holder is VH) {
-            val container = holder.itemView.findViewById<View>(R.id.member_container)
+            val container = holder.binding.memberContainer
             // scan backward for the previous header
             var headerIndex = -1
             for (i in position - 1 downTo 0) {
@@ -161,20 +157,18 @@ class MembersAdapter(
                     count++
                     idx++
                 }
-                val chevron = hv.itemView.findViewById<android.widget.ImageView>(R.id.header_chevron)
+
+                val chevron = hv.binding.headerChevron
                 chevron.rotation = if (collapsed) 90f else -90f
-                val card = hv.itemView.findViewById<View>(R.id.header_card)
+                val card = hv.binding.headerCard
                 card.updateLayoutParams<ViewGroup.MarginLayoutParams> {
                     // add bottom margin when expanded to separate from members
                     bottomMargin = if (collapsed) dpToPx(0) else dpToPx(7)
                 }
-                hv.title.text = "${item.cls.simpleName} ($count)"
-
-                val subtitle = hv.itemView.findViewById<TextView>(R.id.header_subtitle)
-                subtitle.text = pkg
-
+                hv.binding.headerTitle.text = "${item.cls.simpleName} ($count)"
+                hv.binding.headerSubtitle.text = pkg
                 // toggle collapsed state on click
-                hv.itemView.setOnClickListener {
+                hv.binding.root.setOnClickListener {
                     if (collapsed) collapsedClasses.remove(item.cls.name) else collapsedClasses.add(item.cls.name)
                     rebuildVisible()
                     notifyDataSetChanged()
@@ -182,47 +176,47 @@ class MembersAdapter(
             }
             is FieldInfo -> {
                 val hv = holder as VH
-                hv.title.text = item.name
+                hv.binding.memberTitle.text = item.name
                 val valueDesc = try {
                     val v = ReflectionInspector.getField(rootInstance, item.field)
                     val typeName = item.field.type.simpleName
                     val preview = formatPreview(v)
                     "$typeName -> $preview"
                 } catch (_: Exception) { "<error>" }
-                hv.subtitle.text = valueDesc
+                hv.binding.memberSubtitle.text = valueDesc
                 // choose icon by field type/value (use overlays for final/static)
                 val fType = item.field.type
                 val baseDrawable = when {
-                    fType.isEnum -> ContextCompat.getDrawable(hv.itemView.context, R.drawable.ic_public_class)
-                    fType.isArray || java.util.Collection::class.java.isAssignableFrom(fType) -> ContextCompat.getDrawable(hv.itemView.context, R.drawable.ic_field)
-                    java.util.Map::class.java.isAssignableFrom(fType) -> ContextCompat.getDrawable(hv.itemView.context, R.drawable.ic_field)
-                    else -> getFieldDrawable(item.field, hv.itemView)
+                    fType.isEnum -> ContextCompat.getDrawable(hv.binding.root.context, R.drawable.ic_public_class)
+                    fType.isArray || java.util.Collection::class.java.isAssignableFrom(fType) -> ContextCompat.getDrawable(hv.binding.root.context, R.drawable.ic_field)
+                    java.util.Map::class.java.isAssignableFrom(fType) -> ContextCompat.getDrawable(hv.binding.root.context, R.drawable.ic_field)
+                    else -> getFieldDrawable(item.field, hv.binding.root)
                 }
-                hv.icon.setImageDrawable(baseDrawable)
-                hv.itemView.setOnClickListener { onClick(item) }
+                hv.binding.memberIcon.setImageDrawable(baseDrawable)
+                hv.binding.root.setOnClickListener { onClick(item) }
             }
             is MethodInfo -> {
                 val hv = holder as VH
                 val params = item.method.parameterTypes.joinToString(",") { it.simpleName }
-                hv.title.text = "${item.name}(${params})"
-                hv.subtitle.text = "returns ${item.method.returnType.simpleName}"
-                val md = getMethodDrawable(item.method, hv.itemView) ?: ContextCompat.getDrawable(hv.itemView.context, R.drawable.ic_method)
-                hv.icon.setImageDrawable(md)
-                hv.itemView.setOnClickListener { onClick(item) }
+                hv.binding.memberTitle.text = "${item.name}(${params})"
+                hv.binding.memberSubtitle.text = "returns ${item.method.returnType.simpleName}"
+                val md = getMethodDrawable(item.method, hv.binding.root) ?: ContextCompat.getDrawable(hv.binding.root.context, R.drawable.ic_method)
+                hv.binding.memberIcon.setImageDrawable(md)
+                hv.binding.root.setOnClickListener { onClick(item) }
             }
             is ElementInfo -> {
                 val hv = holder as VH
-                hv.title.text = item.name
-                hv.subtitle.text = item.value?.let { it::class.java.simpleName + " -> " + formatPreview(it) } ?: "null"
-                hv.icon.setImageResource(R.drawable.ic_class)
-                hv.itemView.setOnClickListener { onClick(item) }
+                hv.binding.memberTitle.text = item.name
+                hv.binding.memberSubtitle.text = item.value?.let { it::class.java.simpleName + " -> " + formatPreview(it) } ?: "null"
+                hv.binding.memberIcon.setImageResource(R.drawable.ic_class)
+                hv.binding.root.setOnClickListener { onClick(item) }
             }
             is MapEntryInfo -> {
                 val hv = holder as VH
-                hv.title.text = item.key
-                hv.subtitle.text = item.value?.let { it::class.java.simpleName + " -> " + formatPreview(it) } ?: "null"
-                hv.icon.setImageResource(R.drawable.ic_field)
-                hv.itemView.setOnClickListener { onClick(item) }
+                hv.binding.memberTitle.text = item.key
+                hv.binding.memberSubtitle.text = item.value?.let { it::class.java.simpleName + " -> " + formatPreview(it) } ?: "null"
+                hv.binding.memberIcon.setImageResource(R.drawable.ic_field)
+                hv.binding.root.setOnClickListener { onClick(item) }
             }
         }
     }
