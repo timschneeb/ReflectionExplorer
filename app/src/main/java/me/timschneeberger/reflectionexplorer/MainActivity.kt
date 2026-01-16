@@ -25,6 +25,7 @@ import me.timschneeberger.reflectionexplorer.model.MainViewModel
 import me.timschneeberger.reflectionexplorer.utils.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.MethodInfo
 import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector
+import me.timschneeberger.reflectionexplorer.utils.dpToPx
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 
@@ -135,8 +136,6 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        // TODO: dialog has no horizontal margin. does not fit with material 3 dialog!!
-
         val layout = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
         val inputViews = mutableListOf<View>()
         val chosenElementClasses = MutableList<Class<*>?>(params.size) { null }
@@ -207,8 +206,9 @@ class MainActivity : AppCompatActivity() {
                 auto.setOnItemClickListener { _, _, position, _ ->
                     val choice = typeOptions[position]
                     if (choice == "Custom...") {
-                        val inputClass = TextInputEditText(ctx)
-                        // TODO: dialog has no horizontal margin. does not fit with material 3 dialog!!
+                        val inputClass = TextInputEditText(ctx).apply {
+                            setPadding(24.dpToPx(), 12.dpToPx(), 24.dpToPx(), 0)
+                        }
                         MaterialAlertDialogBuilder(ctx)
                             .setTitle("Enter element class (e.g. java.lang.Integer)")
                             .setView(inputClass)
@@ -282,6 +282,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         layout.addView(preview)
+        layout.setPadding(24.dpToPx(), 12.dpToPx(), 24.dpToPx(), 0)
         updatePreview()
 
         // helper to fill defaults
@@ -306,31 +307,41 @@ class MainActivity : AppCompatActivity() {
             updatePreview()
         }
 
-        MaterialAlertDialogBuilder(ctx)
+        val builder = MaterialAlertDialogBuilder(ctx)
             .setTitle("Invoke ${method.name}")
             .setView(layout)
-            .setNeutralButton("Defaults") { _, _ ->
-                fillDefaults()
-                // TODO keep dialog open!
-            }
-            .setPositiveButton("Invoke") { _, _ ->
-                try {
-                    val args = params.mapIndexed { i, t ->
-                        when (val view = inputViews[i]) {
-                            is MaterialCheckBox -> view.isChecked as Any
-                            is TextInputEditText -> parseValue(view.text.toString(), t, genericTypes.getOrNull(i), chosenElementClasses.getOrNull(i))
-                            is MaterialAutoCompleteTextView -> if (t.isEnum) enumConstantFor(t, view.text.toString()) else null
-                            else -> null
-                        }
-                    }.toTypedArray()
-                    val r = ReflectionInspector.invokeMethod(instance, method, args)
-                    detailsText.text = "Invoked ${method.name} -> $r"
-                } catch (e: Exception) {
-                    detailsText.text = "Error invoking: ${e.message}"
-                }
+            .setPositiveButton("Invoke") { dialog, _ ->
+                // positive button click will be handled after show() to access current input values
             }
             .setNegativeButton("Cancel", null)
-            .show()
+            .setNeutralButton("Defaults", null) // we'll override to prevent dismiss
+
+        val dialog = builder.create()
+        dialog.show()
+
+        // override neutral button to keep dialog open and apply defaults
+        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL)?.setOnClickListener {
+            fillDefaults()
+        }
+
+        // handle positive button click using the shown dialog's button so we can read input values
+        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+            try {
+                val args = params.mapIndexed { i, t ->
+                    when (val view = inputViews[i]) {
+                        is MaterialCheckBox -> view.isChecked as Any
+                        is TextInputEditText -> parseValue(view.text.toString(), t, genericTypes.getOrNull(i), chosenElementClasses.getOrNull(i))
+                        is MaterialAutoCompleteTextView -> if (t.isEnum) enumConstantFor(t, view.text.toString()) else null
+                        else -> null
+                    }
+                }.toTypedArray()
+                val r = ReflectionInspector.invokeMethod(instance, method, args)
+                detailsText.text = "Invoked ${method.name} -> $r"
+                dialog.dismiss()
+            } catch (e: Exception) {
+                detailsText.text = "Error invoking: ${e.message}"
+            }
+        }
     }
 
     private fun parseValue(text: String, type: Class<*>, genericType: Type? = null, elementClass: Class<*>? = null): Any? {
