@@ -9,8 +9,9 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
-import me.timschneeberger.reflectionexplorer.InspectorViewModel
 import me.timschneeberger.reflectionexplorer.MainActivity
+import me.timschneeberger.reflectionexplorer.model.MainViewModel
+import me.timschneeberger.reflectionexplorer.model.InspectorViewModel
 import me.timschneeberger.reflectionexplorer.adapter.BreadcrumbAdapter
 import me.timschneeberger.reflectionexplorer.adapter.MembersAdapter
 import me.timschneeberger.reflectionexplorer.databinding.FragmentInspectorBinding
@@ -22,25 +23,39 @@ import me.timschneeberger.reflectionexplorer.utils.MethodInfo
 import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector
 import java.lang.reflect.Array
 
+private const val ARG_STACK_INDEX = "arg_stack_index"
+
 class InspectorFragment : Fragment() {
-    private var instance: Any? = null
+    private var argIndex: Int = -1
     private var bcAdapter: BreadcrumbAdapter? = null
     private lateinit var binding: FragmentInspectorBinding
 
     companion object {
-        fun newInstance(instance: Any): InspectorFragment = InspectorFragment().apply { this.instance = instance }
+        fun newInstance(stackIndex: Int): InspectorFragment = InspectorFragment().apply {
+            arguments = Bundle().apply { putInt(ARG_STACK_INDEX, stackIndex) }
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        argIndex = arguments?.getInt(ARG_STACK_INDEX, -1) ?: -1
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         binding = FragmentInspectorBinding.inflate(inflater, container, false)
 
         val activity = activity as? MainActivity
+        val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
+
+        // resolve instance from MainViewModel stack; if missing, show empty state
+        val instance = mainVm.inspectionStack.getOrNull(argIndex)
+
         val trail = activity?.getInspectionTrail() ?: listOf(instance?.javaClass?.simpleName ?: "root")
 
         bcAdapter = BreadcrumbAdapter(trail, trail.size - 1) { idx ->
             activity?.getInspectionTrail()?.let { live ->
                 bcAdapter?.update(live, idx)
-                binding.breadcrumbs.post { binding.breadcrumbs.smoothScrollToPosition(idx) }
+                binding.breadcrumbs.post { if ((bcAdapter?.itemCount ?: 0) > idx) binding.breadcrumbs.smoothScrollToPosition(idx) }
             }
             activity?.popToLevel(idx)
         }
@@ -48,7 +63,6 @@ class InspectorFragment : Fragment() {
         binding.breadcrumbs.apply {
             layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
             adapter = bcAdapter
-            post { smoothScrollToPosition((bcAdapter?.itemCount ?: 1) - 1) }
         }
 
         // collection info chip
@@ -76,8 +90,7 @@ class InspectorFragment : Fragment() {
                 is MethodInfo -> activity?.onInvokeMethod(inst, member, binding.detailsText)
                 is ElementInfo -> activity?.onInspectElement(member.value, binding.detailsText)
                 is MapEntryInfo -> activity?.onInspectElement(member.value, binding.detailsText)
-                is ClassHeaderInfo -> { /* no-op: adapter handles expand/collapse */
-                }
+                is ClassHeaderInfo -> { /* no-op: adapter handles expand/collapse */ }
             }
         }
 
@@ -104,7 +117,11 @@ class InspectorFragment : Fragment() {
     fun refreshBreadcrumb() {
         (activity as? MainActivity)?.getInspectionTrail()?.let { trail ->
             bcAdapter?.update(trail, trail.size - 1)
-            binding.breadcrumbs.post { binding.breadcrumbs.smoothScrollToPosition((bcAdapter?.itemCount ?: 1) - 1) }
+            binding.breadcrumbs.post {
+                val cnt = bcAdapter?.itemCount ?: 0
+                if (cnt > 0)
+                    binding.breadcrumbs.smoothScrollToPosition(cnt - 1)
+            }
         }
     }
 }

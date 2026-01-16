@@ -1,4 +1,4 @@
-package me.timschneeberger.reflectionexplorer
+package me.timschneeberger.reflectionexplorer.model
 
 import androidx.lifecycle.ViewModel
 

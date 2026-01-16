@@ -7,19 +7,21 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
 import android.widget.TextView
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.textfield.TextInputEditText
-import com.google.android.material.textfield.TextInputLayout
-import com.google.android.material.textfield.MaterialAutoCompleteTextView
-import com.google.android.material.checkbox.MaterialCheckBox
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
+import androidx.lifecycle.ViewModelProvider
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.MaterialAutoCompleteTextView
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
+import com.google.android.material.checkbox.MaterialCheckBox
 import me.timschneeberger.reflectionexplorer.databinding.ActivityMainBinding
 import me.timschneeberger.reflectionexplorer.fragment.InspectorFragment
 import me.timschneeberger.reflectionexplorer.fragment.InstancesFragment
+import me.timschneeberger.reflectionexplorer.model.MainViewModel
 import me.timschneeberger.reflectionexplorer.utils.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.MethodInfo
 import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector
@@ -27,8 +29,8 @@ import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 
 class MainActivity : AppCompatActivity() {
-    private val inspectionStack = mutableListOf<Any>()
     private lateinit var binding: ActivityMainBinding
+    private val vm: MainViewModel by lazy { ViewModelProvider(this)[MainViewModel::class.java] }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,8 +46,13 @@ class MainActivity : AppCompatActivity() {
 
         if (savedInstanceState == null) {
             InstancesFragment().apply {
-                onInstanceSelected = { inst -> inspectionStack.clear(); openInspectorFor(inst) }
+                attachInstancesCallback(this)
                 supportFragmentManager.beginTransaction().replace(R.id.container, this).commit()
+            }
+        } else {
+            // Re-attach callback
+            supportFragmentManager.fragments.filterIsInstance<InstancesFragment>().firstOrNull()?.also { frag ->
+                attachInstancesCallback(frag)
             }
         }
 
@@ -56,9 +63,9 @@ class MainActivity : AppCompatActivity() {
             val canGoBack = supportFragmentManager.backStackEntryCount > 0
             supportActionBar?.setDisplayHomeAsUpEnabled(canGoBack)
 
-            // trim inspectionStack to match back stack count
+            // trim vm stack to match backstack
             val backCount = supportFragmentManager.backStackEntryCount
-            while (inspectionStack.size > backCount) inspectionStack.removeAt(inspectionStack.lastIndex)
+            while (vm.inspectionStack.size > backCount) vm.inspectionStack.removeAt(vm.inspectionStack.lastIndex)
 
             // Post breadcrumb refresh to avoid modifying FragmentManager while it is executing transactions.
             binding.root.post { (supportFragmentManager.findFragmentById(R.id.container) as? InspectorFragment)?.refreshBreadcrumb() }
@@ -67,21 +74,29 @@ class MainActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
     }
 
+    private fun attachInstancesCallback(frag: InstancesFragment) {
+        frag.onInstanceSelected = { inst ->
+            vm.inspectionStack.clear()
+            openInspectorFor(inst)
+        }
+    }
+
     private fun openInspectorFor(instance: Any) {
-        inspectionStack.add(instance)
-        InspectorFragment.newInstance(instance).also { fragment ->
+        vm.inspectionStack.add(instance)
+        val idx = vm.inspectionStack.size - 1
+        InspectorFragment.newInstance(idx).also { fragment ->
             supportFragmentManager.beginTransaction().replace(R.id.container, fragment).addToBackStack(null).commit()
         }
     }
 
-    fun getInspectionTrail(): List<String> = inspectionStack.map { it::class.java.simpleName }
+    fun getInspectionTrail(): List<String> = vm.inspectionStack.map { it::class.java.simpleName }
 
     fun popToLevel(idx: Int) {
         if (idx < 0) return
-        if (idx >= inspectionStack.size - 1) return
-        val toPop = inspectionStack.size - 1 - idx
+        if (idx >= vm.inspectionStack.size - 1) return
+        val toPop = vm.inspectionStack.size - 1 - idx
         repeat(toPop) { if (supportFragmentManager.backStackEntryCount > 0) supportFragmentManager.popBackStack() }
-        while (inspectionStack.size > idx + 1) inspectionStack.removeAt(inspectionStack.lastIndex)
+        while (vm.inspectionStack.size > idx + 1) vm.inspectionStack.removeAt(vm.inspectionStack.lastIndex)
     }
 
     fun onInspectField(instance: Any, fieldInfo: FieldInfo, detailsText: TextView) {
