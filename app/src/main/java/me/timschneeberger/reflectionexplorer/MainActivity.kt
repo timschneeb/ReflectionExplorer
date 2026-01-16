@@ -5,7 +5,6 @@ import android.text.InputType
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
-import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -30,124 +29,79 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
+        binding = ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.toolbar) { v, windowInsets ->
             val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
-            // Apply the insets as a margin to the view. This solution sets
-            // only the bottom, left, and right dimensions, but you can apply whichever
-            // insets are appropriate to your layout. You can also update the view padding
-            // if that's more appropriate.
-            v.updateLayoutParams<ViewGroup.MarginLayoutParams> {
-                leftMargin = insets.left
-                topMargin = insets.top
-                rightMargin = insets.right
-            }
-
-            // Return CONSUMED if you don't want the window insets to keep passing
-            // down to descendant views.
+            v.updateLayoutParams<ViewGroup.MarginLayoutParams> { leftMargin = insets.left; topMargin = insets.top; rightMargin = insets.right }
             WindowInsetsCompat.CONSUMED
         }
 
         if (savedInstanceState == null) {
-            val f = InstancesFragment()
-            f.onInstanceSelected = { inst ->
-                inspectionStack.clear()
-                openInspectorFor(inst)
+            InstancesFragment().apply {
+                onInstanceSelected = { inst -> inspectionStack.clear(); openInspectorFor(inst) }
+                supportFragmentManager.beginTransaction().replace(R.id.container, this).commit()
             }
-            supportFragmentManager.beginTransaction().replace(R.id.container, f).commit()
         }
 
-        // use toolbarView found above
         setSupportActionBar(binding.toolbar)
+
+        // Keep inspectionStack in sync with fragment backstack and update toolbar/back button and breadcrumbs.
         supportFragmentManager.addOnBackStackChangedListener {
             val canGoBack = supportFragmentManager.backStackEntryCount > 0
             supportActionBar?.setDisplayHomeAsUpEnabled(canGoBack)
-            // Keep the inspectionStack size in sync with the fragment back stack
+
+            // trim inspectionStack to match back stack count
             val backCount = supportFragmentManager.backStackEntryCount
-            while (inspectionStack.size > backCount) {
-                inspectionStack.removeAt(inspectionStack.size - 1)
-            }
-            // Post refresh to next loop to ensure fragment view is available
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                val current = supportFragmentManager.findFragmentById(R.id.container) as? InspectorFragment
-                current?.refreshBreadcrumb()
-            }
-         }
+            while (inspectionStack.size > backCount) inspectionStack.removeAt(inspectionStack.lastIndex)
+
+            // Post breadcrumb refresh to avoid modifying FragmentManager while it is executing transactions.
+            binding.root.post { (supportFragmentManager.findFragmentById(R.id.container) as? InspectorFragment)?.refreshBreadcrumb() }
+        }
+
         binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
     }
 
     private fun openInspectorFor(instance: Any) {
-        // push to stack
         inspectionStack.add(instance)
-        val fragment = InspectorFragment.newInstance(instance)
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.container, fragment)
-            .addToBackStack(null)
-            .commit()
+        InspectorFragment.newInstance(instance).also { fragment ->
+            supportFragmentManager.beginTransaction().replace(R.id.container, fragment).addToBackStack(null).commit()
+        }
     }
 
-    fun getInspectionTrail(): List<String> {
-        return inspectionStack.map { it::class.java.simpleName }
-    }
+    fun getInspectionTrail(): List<String> = inspectionStack.map { it::class.java.simpleName }
 
     fun popToLevel(idx: Int) {
-        // ensure idx is within bounds
         if (idx < 0) return
-        if (idx >= inspectionStack.size - 1) return // already at or below
+        if (idx >= inspectionStack.size - 1) return
         val toPop = inspectionStack.size - 1 - idx
-        repeat(toPop) {
-            if (supportFragmentManager.backStackEntryCount > 0) {
-                supportFragmentManager.popBackStack()
-            }
-        }
-        // trim the stack
-        while (inspectionStack.size > idx + 1) inspectionStack.removeAt(inspectionStack.size - 1)
+        repeat(toPop) { if (supportFragmentManager.backStackEntryCount > 0) supportFragmentManager.popBackStack() }
+        while (inspectionStack.size > idx + 1) inspectionStack.removeAt(inspectionStack.lastIndex)
     }
 
     fun onInspectField(instance: Any, fieldInfo: FieldInfo, detailsText: TextView) {
         val field = fieldInfo.field
         try {
-            val v = ReflectionInspector.getField(instance, field)
-            if (v != null) {
-                openInspectorFor(v)
-            } else {
-                detailsText.text = "Member value is null"
-            }
+            ReflectionInspector.getField(instance, field)?.let { openInspectorFor(it) } ?: run { detailsText.text = "Member value is null" }
         } catch (e: Exception) {
             detailsText.text = "Error: ${e.message}"
         }
     }
 
     fun onInspectElement(value: Any?, detailsText: TextView) {
-        if (value != null) {
-            openInspectorFor(value)
-        } else {
-            detailsText.text = "Element is null"
-        }
+        value?.let { openInspectorFor(it) } ?: run { detailsText.text = "Element is null" }
     }
 
     fun onInvokeMethod(instance: Any, methodInfo: MethodInfo, detailsText: TextView) {
-        // If overloads exist, prompt user to pick the correct signature first
         val all = instance::class.java.declaredMethods.filter { it.name == methodInfo.method.name }
         if (all.size > 1) {
-            val sigs = all.map { m ->
-                val params = m.parameterTypes.joinToString(",") { it.simpleName }
-                "${m.name}(${params}) : ${m.returnType.simpleName}"
-            }
-            val ctx = this
+            val sigs = all.map { m -> val params = m.parameterTypes.joinToString(",") { it.simpleName }; "${m.name}(${params}) : ${m.returnType.simpleName}" }
             MaterialAlertDialogBuilder(this)
                 .setTitle("Choose overload for ${methodInfo.method.name}")
-                .setItems(sigs.toTypedArray()) { _, which ->
-                    val sel = all[which]
-                    showMethodInvocationDialog(instance, sel, detailsText)
-                }
+                .setItems(sigs.toTypedArray()) { _, which -> showMethodInvocationDialog(instance, all[which], detailsText) }
                 .setNegativeButton("Cancel", null)
                 .show()
-        } else {
-            showMethodInvocationDialog(instance, methodInfo.method, detailsText)
-        }
+        } else showMethodInvocationDialog(instance, methodInfo.method, detailsText)
     }
 
     // Show invocation dialog for a specific Method
