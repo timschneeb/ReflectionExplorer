@@ -8,18 +8,18 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import me.timschneeberger.reflectionexplorer.InstancesProvider
+import me.timschneeberger.reflectionexplorer.MainActivity
 import me.timschneeberger.reflectionexplorer.adapter.InstancesAdapter
 
 class InstancesFragment : Fragment() {
-    var onInstanceSelected: ((Any) -> Unit)? = null
-
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val testInstances = InstancesProvider.instances.toList() + container!! + inflater
 
         return RecyclerView(requireContext()).apply {
             layoutManager = LinearLayoutManager(requireContext())
-            adapter = InstancesAdapter(testInstances) { inst -> onInstanceSelected?.invoke(inst) }
+            adapter = InstancesAdapter(testInstances) {
+                (activity as? MainActivity)?.handleInstanceSelected(it)
+            }
         }
     }
 }
-

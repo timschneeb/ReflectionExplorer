@@ -45,18 +45,15 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (savedInstanceState == null) {
-            InstancesFragment().apply {
-                attachInstancesCallback(this)
-                supportFragmentManager.beginTransaction().replace(R.id.container, this).commit()
-            }
-        } else {
-            // Re-attach callback
-            supportFragmentManager.fragments.filterIsInstance<InstancesFragment>().firstOrNull()?.also { frag ->
-                attachInstancesCallback(frag)
+            InstancesFragment().also {
+                supportFragmentManager.beginTransaction().replace(R.id.container, it).commit()
             }
         }
 
         setSupportActionBar(binding.toolbar)
+
+        // Make sure the Up arrow reflects the current back stack on activity recreate
+        supportActionBar?.setDisplayHomeAsUpEnabled(supportFragmentManager.backStackEntryCount > 0)
 
         // Keep inspectionStack in sync with fragment backstack and update toolbar/back button and breadcrumbs.
         supportFragmentManager.addOnBackStackChangedListener {
@@ -74,11 +71,10 @@ class MainActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
     }
 
-    private fun attachInstancesCallback(frag: InstancesFragment) {
-        frag.onInstanceSelected = { inst ->
-            vm.inspectionStack.clear()
-            openInspectorFor(inst)
-        }
+    // Called by InstancesFragment when user selects an instance
+    fun handleInstanceSelected(instance: Any) {
+        vm.inspectionStack.clear()
+        openInspectorFor(instance)
     }
 
     private fun openInspectorFor(instance: Any) {
