@@ -116,6 +116,28 @@ class MembersAdapter(
             }
         }
 
+        if (holder is VH){
+            // set item background according to position (first/last/single/middle)
+            val container = holder.itemView.findViewById<View>(R.id.member_container)
+            val visibleCount = visibleItems.count { it !is ClassHeaderInfo }
+            // compute index among members (skip headers)
+            var memberIndex = -1
+            var seen = -1
+            for (i in 0 until visibleItems.size) {
+                if (visibleItems[i] !is ClassHeaderInfo) {
+                    seen++
+                    if (i == position) { memberIndex = seen; break }
+                }
+            }
+            val bgRes = when {
+                visibleCount <= 1 -> R.drawable.bg_member_single
+                memberIndex == 0 -> R.drawable.bg_member_top
+                memberIndex == visibleCount - 1 -> R.drawable.bg_member_bottom
+                else -> R.drawable.bg_member_middle
+            }
+            container?.setBackgroundResource(bgRes)
+        }
+
         when (item) {
             is ClassHeaderInfo -> {
                 val hv = holder as HeaderVH
@@ -178,13 +200,6 @@ class MembersAdapter(
                 val hv = holder as VH
                 hv.title.text = item.key
                 hv.subtitle.text = item.value?.let { it::class.java.simpleName + " -> " + formatPreview(it) } ?: "null"
-                hv.icon.setImageResource(R.drawable.ic_field)
-                hv.itemView.setOnClickListener { onClick(item) }
-            }
-            else -> {
-                val hv = holder as VH
-                hv.title.text = item.name
-                hv.subtitle.text = ""
                 hv.icon.setImageResource(R.drawable.ic_field)
                 hv.itemView.setOnClickListener { onClick(item) }
             }
