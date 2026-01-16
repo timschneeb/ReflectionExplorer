@@ -29,7 +29,12 @@ class BreadcrumbAdapter(
         holder.chip.isCheckable = true
         holder.chip.isChecked = position == selectedIndex
         holder.chip.isClickable = true
-        holder.chip.setOnClickListener { onClick(position) }
+        holder.chip.setOnCheckedChangeListener { _, _ ->
+            if (position == selectedIndex)
+                holder.chip.isChecked = true // cannot uncheck the selected chip
+
+            onClick(position)
+        }
     }
 
     override fun getItemCount(): Int = items.size

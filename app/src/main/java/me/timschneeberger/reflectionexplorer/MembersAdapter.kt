@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.core.content.ContextCompat
+import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
 import java.lang.reflect.Field
 import java.lang.reflect.Method
@@ -160,8 +161,18 @@ class MembersAdapter(
                     count++
                     idx++
                 }
-                val chevron = if (collapsed) "\u25B6" /* ▶ */ else "\u25BC" /* ▼ */
-                hv.title.text = "$chevron ${item.cls.simpleName} ($count) — $pkg"
+                val chevron = hv.itemView.findViewById<android.widget.ImageView>(R.id.header_chevron)
+                chevron.rotation = if (collapsed) 90f else -90f
+                val card = hv.itemView.findViewById<View>(R.id.header_card)
+                card.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                    // add bottom margin when expanded to separate from members
+                    bottomMargin = if (collapsed) dpToPx(0) else dpToPx(7)
+                }
+                hv.title.text = "${item.cls.simpleName} ($count)"
+
+                val subtitle = hv.itemView.findViewById<TextView>(R.id.header_subtitle)
+                subtitle.text = pkg
+
                 // toggle collapsed state on click
                 hv.itemView.setOnClickListener {
                     if (collapsed) collapsedClasses.remove(item.cls.name) else collapsedClasses.add(item.cls.name)
