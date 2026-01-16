@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -79,6 +80,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun openInspectorFor(instance: Any) {
+        // If primitive or simple boxed type, do not open inspector
+        if (instance::class.java.isPrimitive ||
+            instance is java.lang.String || instance is java.lang.Number ||
+            instance is java.lang.Boolean || instance is Character
+        ) {
+            Toast.makeText(this, "Cannot inspect primitive or simple types", Toast.LENGTH_SHORT).show()
+            return
+        }
+
         vm.inspectionStack.add(instance)
         val idx = vm.inspectionStack.size - 1
         InspectorFragment.newInstance(idx).also { fragment ->
