@@ -112,29 +112,19 @@ class MainActivity : AppCompatActivity() {
             val v = ReflectionInspector.getField(instance, field)
             if (v != null) {
                 openInspectorFor(v)
-                detailsText.text = "Inspecting ${field.name} -> ${v::class.java.name}"
             } else {
-                detailsText.text = "Value is null"
+                detailsText.text = "Member value is null"
             }
         } catch (e: Exception) {
             detailsText.text = "Error: ${e.message}"
         }
     }
 
-    fun onInspectElement(container: Any, index: Int, value: Any?, detailsText: TextView) {
+    fun onInspectElement(value: Any?, detailsText: TextView) {
         if (value != null) {
             openInspectorFor(value)
-            detailsText.text = "Inspecting element [$index] -> ${value::class.java.name}"
         } else {
             detailsText.text = "Element is null"
-        }
-    }
-
-    fun onInspectMapEntry(container: Any, key: String, value: Any?, detailsText: TextView) {
-        if (value != null) {
-            openInspectorFor(value)
-        } else {
-            detailsText.text = "Entry value is null"
         }
     }
 

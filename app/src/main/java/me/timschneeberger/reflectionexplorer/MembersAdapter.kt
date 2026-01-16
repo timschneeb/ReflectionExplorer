@@ -1,5 +1,6 @@
 package me.timschneeberger.reflectionexplorer
 
+import android.annotation.SuppressLint
 import android.content.res.Resources
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.LayerDrawable
@@ -223,6 +224,7 @@ class MembersAdapter(
 
     override fun getItemCount(): Int = visibleItems.size
 
+    @SuppressLint("NotifyDataSetChanged")
     fun update(newItems: List<MemberInfo>) {
         this.fullItems = newItems
         rebuildVisible()

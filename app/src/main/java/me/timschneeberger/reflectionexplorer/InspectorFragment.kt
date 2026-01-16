@@ -5,6 +5,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import me.timschneeberger.reflectionexplorer.databinding.FragmentInspectorBinding
 
@@ -70,13 +71,13 @@ class InspectorFragment : Fragment() {
         val inst = instance ?: return root
         val members = ReflectionInspector.listMembers(inst)
         // persist collapsed header state in a ViewModel so it survives rotation
-        val vm = androidx.lifecycle.ViewModelProvider(requireActivity()).get(InspectorViewModel::class.java)
+        val vm = ViewModelProvider(requireActivity())[InspectorViewModel::class.java]
         val membersAdapter = MembersAdapter(members, inst, vm.collapsedClasses) { member ->
             when (member) {
-                is FieldInfo -> (activity as? MainActivity)?.onInspectField(inst, member, detailsText)
-                is MethodInfo -> (activity as? MainActivity)?.onInvokeMethod(inst, member, detailsText)
-                is ElementInfo -> (activity as? MainActivity)?.onInspectElement(inst, member.index, member.value, detailsText)
-                is MapEntryInfo -> (activity as? MainActivity)?.onInspectMapEntry(inst, member.key, member.value, detailsText)
+                is FieldInfo -> activity?.onInspectField(inst, member, detailsText)
+                is MethodInfo -> activity?.onInvokeMethod(inst, member, detailsText)
+                is ElementInfo -> activity?.onInspectElement(member.value, detailsText)
+                is MapEntryInfo -> activity?.onInspectElement(member.value, detailsText)
                 is ClassHeaderInfo -> { /* headers are handled in adapter (expand/collapse) */ }
             }
         }
@@ -101,6 +102,7 @@ class InspectorFragment : Fragment() {
             binding.breadcrumbs.post { binding.breadcrumbs.smoothScrollToPosition((bcAdapter?.itemCount ?: 1) - 1) }
         }
     }
+
     // Called by activity when back stack changes so fragment can refresh breadcrumb UI immediately
     fun refreshBreadcrumb() {
         val activity = activity as? MainActivity ?: return
