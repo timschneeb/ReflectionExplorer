@@ -17,7 +17,7 @@ private fun Drawable?.composeWithOverlays(overlays: List<Drawable?>): Drawable? 
     if (overlays.isEmpty()) return this
 
     val layers = mutableListOf<Drawable>().apply {
-        add(this@composeWithOverlays);
+        add(this@composeWithOverlays)
         overlays.filterNotNull().forEach(::add)
     }.toTypedArray()
     val ld = LayerDrawable(layers)

@@ -67,13 +67,13 @@ class InspectorFragment : Fragment() {
 
         // collection info chip
         binding.collectionInfoChip.apply {
-            when (val instVal = instance) {
-                is Collection<*> -> { text = "Collection: size=${instVal.size}"; visibility = View.VISIBLE }
+            when (instance) {
+                is Collection<*> -> { text = "Collection: size=${instance.size}"; visibility = View.VISIBLE }
                 else -> {
-                    val cls = instVal?.javaClass
+                    val cls = instance?.javaClass
                     when {
-                        cls?.isArray == true -> { text = "Array: size=${Array.getLength(instVal!!)}"; visibility = View.VISIBLE }
-                        instVal is Map<*, *> -> { text = "Map: size=${instVal.size}"; visibility = View.VISIBLE }
+                        cls?.isArray == true -> { text = "Array: size=${Array.getLength(instance!!)}"; visibility = View.VISIBLE }
+                        instance is Map<*, *> -> { text = "Map: size=${instance.size}"; visibility = View.VISIBLE }
                         else -> visibility = View.GONE
                     }
                 }

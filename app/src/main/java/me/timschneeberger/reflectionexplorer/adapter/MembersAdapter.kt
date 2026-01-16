@@ -86,7 +86,7 @@ class MembersAdapter(
     private fun formatPreview(v: Any?): String = try {
         when (v) {
             null -> "null"
-            is CharSequence -> v.toString().let { s -> if (s.length > 80) "\"${s.substring(0, 80)}...\" (len=${s.length})" else "\"$s\"" }
+            is CharSequence -> v.toString().let { s -> if (s.length > 80) "\"${s.take(80)}...\" (len=${s.length})" else "\"$s\"" }
             is Collection<*> -> "size=${v.size} [${v.take(3).joinToString(", ") { it?.toString() ?: "null" }}]"
             is Map<*, *> -> "size=${v.size} {${v.entries.take(3).joinToString(", ") { e -> "${e.key}->${e.value?.toString() ?: "null"}" }}}"
             else -> {

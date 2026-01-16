@@ -143,8 +143,7 @@ class MainActivity : AppCompatActivity() {
         fun updatePreview() {
             val parsed = params.mapIndexed { i, pClasspath ->
                 try {
-                    val view = inputViews[i]
-                    when (view) {
+                    when (val view = inputViews[i]) {
                         is MaterialCheckBox -> view.isChecked
                         is TextInputEditText -> parseValue(view.text.toString(), pClasspath, genericTypes.getOrNull(i), chosenElementClasses.getOrNull(i))
                         is MaterialAutoCompleteTextView -> if (pClasspath.isEnum) enumConstantFor(pClasspath, view.text.toString()) else "<type-selector>"
@@ -152,7 +151,7 @@ class MainActivity : AppCompatActivity() {
                     }
                 } catch (_: Exception) { "<err>" }
             }
-            preview.text = "Preview: ${parsed}"
+            preview.text = "Preview: $parsed"
         }
 
         val typeOptions = listOf("String", "Int", "Long", "Double", "Boolean", "Custom...")
@@ -232,15 +231,15 @@ class MainActivity : AppCompatActivity() {
                 layout.addView(til)
             }
 
-            when {
-                pClass == Boolean::class.java || pClass == java.lang.Boolean.TYPE -> {
+            when (pClass) {
+                Boolean::class.java, java.lang.Boolean.TYPE -> {
                     val cb = MaterialCheckBox(ctx)
                     cb.isChecked = false
                     cb.setOnCheckedChangeListener { _, _ -> updatePreview() }
                     inputViews.add(cb)
                     layout.addView(cb)
                 }
-                pClass == Int::class.java || pClass == Integer.TYPE || pClass == Long::class.java || pClass == java.lang.Long.TYPE || pClass == Double::class.java || pClass == java.lang.Double.TYPE -> {
+                Int::class.java, Integer.TYPE, Long::class.java, java.lang.Long.TYPE, Double::class.java, java.lang.Double.TYPE -> {
                     val til = TextInputLayout(ctx)
                     val numInput = TextInputEditText(ctx)
                     numInput.inputType = when (pClass) {
@@ -285,14 +284,13 @@ class MainActivity : AppCompatActivity() {
         // helper to fill defaults
         fun fillDefaults() {
             params.forEachIndexed { i, pClass ->
-                val view = inputViews[i]
-                when (view) {
+                when (val view = inputViews[i]) {
                     is MaterialCheckBox -> view.isChecked = false
                     is TextInputEditText -> {
-                        val def = when {
-                            pClass == Int::class.java || pClass == Integer.TYPE -> "0"
-                            pClass == Long::class.java || pClass == java.lang.Long.TYPE -> "0"
-                            pClass == Double::class.java || pClass == java.lang.Double.TYPE -> "0.0"
+                        val def = when (pClass) {
+                            Int::class.java, Integer.TYPE -> "0"
+                            Long::class.java, java.lang.Long.TYPE -> "0"
+                            Double::class.java, java.lang.Double.TYPE -> "0.0"
                             else -> ""
                         }
                         view.setText(def)
@@ -312,8 +310,7 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Invoke") { _, _ ->
                 try {
                     val args = params.mapIndexed { i, t ->
-                        val view = inputViews[i]
-                        when (view) {
+                        when (val view = inputViews[i]) {
                             is MaterialCheckBox -> view.isChecked as Any
                             is TextInputEditText -> parseValue(view.text.toString(), t, genericTypes.getOrNull(i), chosenElementClasses.getOrNull(i))
                             is MaterialAutoCompleteTextView -> if (t.isEnum) enumConstantFor(t, view.text.toString()) else null
@@ -359,10 +356,7 @@ class MainActivity : AppCompatActivity() {
                 val inner = content.substring(1, content.length - 1)
                 val parts = if (inner.isBlank()) emptyList() else inner.split(",").map { it.trim() }
                 val elementCls: Class<*>? = elementClass ?: when (genericType) {
-                    is ParameterizedType -> {
-                        val arg = genericType.actualTypeArguments.getOrNull(0)
-                        if (arg is Class<*>) arg else null
-                    }
+                    is ParameterizedType -> genericType.actualTypeArguments.getOrNull(0) as? Class<*>
                     else -> null
                 }
                 val list = ArrayList<Any?>()
@@ -379,10 +373,7 @@ class MainActivity : AppCompatActivity() {
                 val inner = content.substring(1, content.length - 1)
                 val map = mutableMapOf<String, Any?>()
                 val valueCls: Class<*>? = elementClass ?: when (genericType) {
-                    is ParameterizedType -> {
-                        val arg = genericType.actualTypeArguments.getOrNull(1)
-                        if (arg is Class<*>) arg else null
-                    }
+                    is ParameterizedType -> genericType.actualTypeArguments.getOrNull(1) as? Class<*>
                     else -> null
                 }
                 if (inner.isNotBlank()) {
@@ -402,7 +393,7 @@ class MainActivity : AppCompatActivity() {
         // Fallback: attempt boxed Number parsing
         if (Number::class.java.isAssignableFrom(type)) {
             return when (type) {
-                java.lang.Integer::class.java -> text.toIntOrNull() ?: 0
+                Integer::class.java -> text.toIntOrNull() ?: 0
                 java.lang.Long::class.java -> text.toLongOrNull() ?: 0L
                 java.lang.Double::class.java -> text.toDoubleOrNull() ?: 0.0
                 else -> null
