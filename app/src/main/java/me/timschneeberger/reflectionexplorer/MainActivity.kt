@@ -120,15 +120,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun onInvokeMethod(instance: Any, methodInfo: MethodInfo, detailsText: TextView) {
-        val all = instance::class.java.declaredMethods.filter { it.name == methodInfo.method.name }
-        if (all.size > 1) {
-            val sigs = all.map { m -> val params = m.parameterTypes.joinToString(",") { it.simpleName }; "${m.name}(${params}) : ${m.returnType.simpleName}" }
-            MaterialAlertDialogBuilder(this)
-                .setTitle("Choose overload for ${methodInfo.method.name}")
-                .setItems(sigs.toTypedArray()) { _, which -> showMethodInvocationDialog(instance, all[which], detailsText) }
-                .setNegativeButton("Cancel", null)
-                .show()
-        } else showMethodInvocationDialog(instance, methodInfo.method, detailsText)
+       showMethodInvocationDialog(instance, methodInfo.method, detailsText)
     }
 
     // Show invocation dialog for a specific Method
@@ -141,7 +133,7 @@ class MainActivity : AppCompatActivity() {
                 val r = ReflectionInspector.invokeMethod(instance, method)
                 detailsText.text = "Invoked ${method.name} -> $r"
             } catch (e: Exception) {
-                detailsText.text = "Error invoking: ${e.message}"
+                detailsText.text = "Error invoking: $e"
             }
             return
         }
