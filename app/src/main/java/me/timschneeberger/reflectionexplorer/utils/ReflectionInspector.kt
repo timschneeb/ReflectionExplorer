@@ -52,6 +52,7 @@ class ElementInfo(name: String, val index: Int, val value: Any?) : MemberInfo(na
     override fun getType(rootInstance: Any): Class<*> {
         val currentValue = getValue(rootInstance)
         if (currentValue != null) return currentValue.javaClass
+
         // if null try to infer from array component type
         return rootInstance::class.java.componentType ?: Any::class.java
     }
@@ -149,8 +150,6 @@ object ReflectionInspector {
                             copy[index] = newValue
                             copy
                         } else null
-                    } catch (_: Exception) {
-                        null
                     }
                 } else null
             }

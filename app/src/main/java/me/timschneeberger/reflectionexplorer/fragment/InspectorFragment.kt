@@ -1,6 +1,5 @@
 package me.timschneeberger.reflectionexplorer.fragment
 
-import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -137,32 +136,56 @@ class InspectorFragment : Fragment() {
                 val activityCompat = (activity as? AppCompatActivity) ?: return@setOnClickListener
                 Dialogs.showEditValueDialog(activityCompat, "Add element", "Value", "", collectionType, null, null, binding.root) { ok, parsed, _ ->
                     if (!ok || parsed == null) return@showEditValueDialog
-                    when (inst) {
-                        is MutableList<*> -> {
+                    when {
+                        // Prefer in-place mutation when the concrete list supports it.
+                        inst is MutableList<*> -> {
                             @Suppress("UNCHECKED_CAST")
-                            (inst as MutableList<Any?>).add(parsed)
-                            activity.replaceStackAt(argIndex, inst)
+                            val ml = inst as MutableList<Any?>
+                            val added = try {
+                                ml.add(parsed)
+                                true
+                            } catch (e: UnsupportedOperationException) {
+                                false
+                            } catch (e: Exception) {
+                                false
+                            }
+                            if (added) {
+                                // mutated in-place
+                                activity.replaceStackAt(argIndex, inst)
+                            } else {
+                                // underlying list is fixed-size (e.g., Arrays.asList); create a new mutable copy
+                                val newList = ArrayList(ml)
+                                newList.add(parsed)
+                                activity.replaceStackAt(argIndex, newList)
+                            }
                         }
-                        is Collection<*> -> {
+                        inst is List<*> -> {
+                            // Non-mutable List: create mutable copy and replace
                             val newList = ArrayList(inst)
                             newList.add(parsed)
                             activity.replaceStackAt(argIndex, newList)
                         }
-                        is Map<*, *> -> {
+                        inst is Map<*, *> -> {
                             // for maps, create a new map and add generated key
                             // TODO: allow custom key input; do not forget to handle key type parsing
-                            val newMap = LinkedHashMap<String, Any?>((inst as Map<String, Any?>))
+                            @Suppress("UNCHECKED_CAST")
+                            val mapView = inst as Map<Any?, Any?>
+                            val newMap = LinkedHashMap(mapView)
                             val newKey = "key${newMap.size}"
                             newMap[newKey] = parsed
                             activity.replaceStackAt(argIndex, newMap)
                         }
-                        else -> if (inst.javaClass.isArray) {
+                        inst.javaClass.isArray -> {
                             val comp = inst.javaClass.componentType ?: return@showEditValueDialog
                             val len = ReflectionInspector.getArrayLength(inst)
                             val newArr = ReflectionInspector.newArrayInstance(comp, len + 1)
                             for (i in 0 until len) ReflectionInspector.setArrayElement(newArr, i, ReflectionInspector.getArrayElement(inst, i))
                             ReflectionInspector.setArrayElement(newArr, len, parsed)
                             activity.replaceStackAt(argIndex, newArr)
+                        }
+                        else -> {
+                            // unsupported container
+                            throw IllegalStateException("Unsupported collection type for adding elements")
                         }
                     }
                 }
