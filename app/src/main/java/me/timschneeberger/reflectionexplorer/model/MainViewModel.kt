@@ -7,18 +7,26 @@ class MainViewModel : ViewModel() {
     // hold object references for the inspection trail across config changes
     val inspectionStack: MutableList<Any> = mutableListOf()
 
-    // Filter tri-state for member visibility
     enum class TriState { DEFAULT, INCLUDE, EXCLUDE }
 
     data class MemberFilter(
-        var visibilityPublic: TriState = TriState.DEFAULT,
-        var visibilityProtected: TriState = TriState.DEFAULT,
-        var visibilityPrivate: TriState = TriState.DEFAULT,
+        var visibilityPublic: Boolean = false,
+        var visibilityProtected: Boolean = false,
+        var visibilityPrivate: Boolean = false,
+        var visibilityPackage: Boolean = false, // package-private
         var isStatic: TriState = TriState.DEFAULT,
         var isFinal: TriState = TriState.DEFAULT,
-        var kindMethods: TriState = TriState.DEFAULT, // methods
-        var kindFields: TriState = TriState.DEFAULT   // fields
-    )
+        var kindMethods: Boolean = false,
+        var kindFields: Boolean = false
+    ) {
+        fun anyFiltersActive(): Boolean {
+            if (visibilityPublic || visibilityProtected || visibilityPrivate || visibilityPackage) return true
+            if (kindFields || kindMethods) return true
+            if (isStatic != TriState.DEFAULT) return true
+            if (isFinal != TriState.DEFAULT) return true
+            return false
+        }
+    }
 
     val memberFilter: MemberFilter = MemberFilter()
 

@@ -1,5 +1,6 @@
 package me.timschneeberger.reflectionexplorer.fragment
 
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -10,6 +11,7 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import me.timschneeberger.reflectionexplorer.MainActivity
+import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
 import me.timschneeberger.reflectionexplorer.model.InspectorViewModel
 import me.timschneeberger.reflectionexplorer.adapter.BreadcrumbAdapter
@@ -22,7 +24,7 @@ import me.timschneeberger.reflectionexplorer.utils.MapEntryInfo
 import me.timschneeberger.reflectionexplorer.utils.MethodInfo
 import me.timschneeberger.reflectionexplorer.utils.MemberInfo
 import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector
-import java.lang.reflect.Array
+import java.lang.reflect.Modifier
 
 private const val ARG_STACK_INDEX = "arg_stack_index"
 
@@ -30,6 +32,10 @@ class InspectorFragment : Fragment() {
     private var argIndex: Int = -1
     private var bcAdapter: BreadcrumbAdapter? = null
     private lateinit var binding: FragmentInspectorBinding
+
+    // store original tint values so we can restore them when not highlighted
+    private var filterButtonBgDefault: ColorStateList? = null
+    private var filterButtonIconDefault: ColorStateList? = null
 
     // make adapter a property so we can update it from observers
     private var membersAdapter: MembersAdapter? = null
@@ -69,27 +75,28 @@ class InspectorFragment : Fragment() {
             adapter = bcAdapter
         }
 
-        // filter button
+        // filter button opens sheet; highlighting is handled via LiveData observer below
         binding.filterButton.setOnClickListener {
             FilterBottomSheetFragment.newInstance().show(parentFragmentManager, "filters")
         }
 
-        // collection info chip
+        val inst = instance ?: return binding.root
+
+        // collection info chip (moved after inst is known to avoid null assertions)
         binding.collectionInfoChip.apply {
-            when (instance) {
-                is Collection<*> -> { text = "Collection: size=${instance.size}"; visibility = View.VISIBLE }
+            when (inst) {
+                is Collection<*> -> { text = getString(R.string.collection_size, inst.size); visibility = View.VISIBLE }
                 else -> {
-                    val cls = instance?.javaClass
+                    val cls = inst.javaClass
                     when {
-                        cls?.isArray == true -> { text = "Array: size=${Array.getLength(instance!!)}"; visibility = View.VISIBLE }
-                        instance is Map<*, *> -> { text = "Map: size=${instance.size}"; visibility = View.VISIBLE }
+                        cls.isArray -> { text = getString(R.string.array_size, java.lang.reflect.Array.getLength(inst)); visibility = View.VISIBLE }
+                        inst is Map<*, *> -> { text = getString(R.string.map_size, inst.size); visibility = View.VISIBLE }
                         else -> visibility = View.GONE
                     }
                 }
             }
         }
 
-        val inst = instance ?: return binding.root
         val membersRaw = ReflectionInspector.listMembers(inst)
         val members = applyFilters(membersRaw, mainVm)
 
@@ -111,10 +118,18 @@ class InspectorFragment : Fragment() {
             adapter = membersAdapter
         }
 
-        // observe filter changes and update members list immediately
-        mainVm.memberFilterLive.observe(viewLifecycleOwner) { _ ->
+        // observe filter changes and update members list & button highlight immediately
+        mainVm.memberFilterLive.observe(viewLifecycleOwner) { f ->
             val updated = applyFilters(ReflectionInspector.listMembers(inst), mainVm)
             membersAdapter?.update(updated)
+            binding.filterButton.isChecked = f.anyFiltersActive()
+        }
+
+        // ensure initial highlight reflects current VM state
+        binding.filterButton.isCheckable = true
+        binding.filterButton.isChecked = mainVm.memberFilter.anyFiltersActive()
+        binding.filterButton.addOnCheckedChangeListener { _, _ ->
+            binding.filterButton.isChecked = mainVm.memberFilter.anyFiltersActive()
         }
 
         viewLifecycleOwner.lifecycle.addObserver(object : DefaultLifecycleObserver {
@@ -130,92 +145,66 @@ class InspectorFragment : Fragment() {
     }
 
     private fun applyFilters(members: List<MemberInfo>, mainVm: MainViewModel): List<MemberInfo> {
-        // basic filtering: currently supports visibility include/exclude (public/protected/private), kindFilters and modifier filters; keep headers
         val f = mainVm.memberFilter
+
+        // helper: return visibility string for modifiers
+        fun visOf(mods: Int): String = when {
+            Modifier.isPublic(mods) -> "public"
+            Modifier.isProtected(mods) -> "protected"
+            Modifier.isPrivate(mods) -> "private"
+            else -> "package"
+        }
+
+        // helper: whether visibility filters are active
+        val visibilityActive = f.visibilityPublic || f.visibilityProtected || f.visibilityPrivate || f.visibilityPackage
+
+        // helper: check whether a given modifiers value passes the visibility filter
+        fun visibilityAllowed(mods: Int): Boolean {
+            if (!visibilityActive) return true
+            return when (visOf(mods)) {
+                "public" -> f.visibilityPublic
+                "protected" -> f.visibilityProtected
+                "private" -> f.visibilityPrivate
+                "package" -> f.visibilityPackage
+                else -> true
+            }
+        }
+
+        // helper: tri-state matcher for a predicate on modifiers (e.g., isStatic/isFinal)
+        fun triMatches(mods: Int, state: MainViewModel.TriState, predicate: (Int) -> Boolean): Boolean = when (state) {
+            MainViewModel.TriState.DEFAULT -> true
+            MainViewModel.TriState.INCLUDE -> predicate(mods)
+            MainViewModel.TriState.EXCLUDE -> !predicate(mods)
+        }
+
         return members.filter { m ->
             when (m) {
                 is ClassHeaderInfo -> true
-                is FieldInfo -> {
-                    val acc = m.field
-                    // visibility check
-                    val isPub = java.lang.reflect.Modifier.isPublic(acc.modifiers)
-                    val isProt = java.lang.reflect.Modifier.isProtected(acc.modifiers)
-                    val isPriv = java.lang.reflect.Modifier.isPrivate(acc.modifiers)
-                    val vis = when {
-                        isPub -> "public"
-                        isProt -> "protected"
-                        isPriv -> "private"
-                        else -> "other"
-                    }
-                    // include precedence: if any INCLUDE present -> only allow those
-                    val hasInclude = listOf(f.visibilityPublic, f.visibilityProtected, f.visibilityPrivate).any { it == MainViewModel.TriState.INCLUDE }
-                    if (hasInclude) {
-                        val allowed = mutableSetOf<String>()
-                        if (f.visibilityPublic == MainViewModel.TriState.INCLUDE) allowed.add("public")
-                        if (f.visibilityProtected == MainViewModel.TriState.INCLUDE) allowed.add("protected")
-                        if (f.visibilityPrivate == MainViewModel.TriState.INCLUDE) allowed.add("private")
-                        if (!allowed.contains(vis)) return@filter false
-                    } else {
-                        // apply excludes
-                        if (f.visibilityPublic == MainViewModel.TriState.EXCLUDE && vis == "public") return@filter false
-                        if (f.visibilityProtected == MainViewModel.TriState.EXCLUDE && vis == "protected") return@filter false
-                        if (f.visibilityPrivate == MainViewModel.TriState.EXCLUDE && vis == "private") return@filter false
+
+                is FieldInfo, is MethodInfo -> {
+                    val mods = when (m) {
+                        is FieldInfo -> m.field.modifiers
+                        is MethodInfo -> m.method.modifiers
+                        else -> 0
                     }
 
-                    // kind filter for fields
-                    when (f.kindFields) {
-                        MainViewModel.TriState.EXCLUDE -> return@filter false
-                        MainViewModel.TriState.INCLUDE -> { /* keep */ }
-                        else -> { }
-                    }
-
-                    // static/final
-                    if (f.isStatic == MainViewModel.TriState.INCLUDE && !java.lang.reflect.Modifier.isStatic(acc.modifiers)) return@filter false
-                    if (f.isStatic == MainViewModel.TriState.EXCLUDE && java.lang.reflect.Modifier.isStatic(acc.modifiers)) return@filter false
-                    if (f.isFinal == MainViewModel.TriState.INCLUDE && !java.lang.reflect.Modifier.isFinal(acc.modifiers)) return@filter false
-                    if (f.isFinal == MainViewModel.TriState.EXCLUDE && java.lang.reflect.Modifier.isFinal(acc.modifiers)) return@filter false
-
-                    true
-                }
-                is MethodInfo -> {
-                    val acc = m.method
                     // visibility
-                    val isPub = java.lang.reflect.Modifier.isPublic(acc.modifiers)
-                    val isProt = java.lang.reflect.Modifier.isProtected(acc.modifiers)
-                    val isPriv = java.lang.reflect.Modifier.isPrivate(acc.modifiers)
-                    val vis = when {
-                        isPub -> "public"
-                        isProt -> "protected"
-                        isPriv -> "private"
-                        else -> "other"
-                    }
-                    val hasInclude = listOf(f.visibilityPublic, f.visibilityProtected, f.visibilityPrivate).any { it == MainViewModel.TriState.INCLUDE }
-                    if (hasInclude) {
-                        val allowed = mutableSetOf<String>()
-                        if (f.visibilityPublic == MainViewModel.TriState.INCLUDE) allowed.add("public")
-                        if (f.visibilityProtected == MainViewModel.TriState.INCLUDE) allowed.add("protected")
-                        if (f.visibilityPrivate == MainViewModel.TriState.INCLUDE) allowed.add("private")
-                        if (!allowed.contains(vis)) return@filter false
-                    } else {
-                        if (f.visibilityPublic == MainViewModel.TriState.EXCLUDE && vis == "public") return@filter false
-                        if (f.visibilityProtected == MainViewModel.TriState.EXCLUDE && vis == "protected") return@filter false
-                        if (f.visibilityPrivate == MainViewModel.TriState.EXCLUDE && vis == "private") return@filter false
+                    if (!visibilityAllowed(mods)) return@filter false
+
+                    // kind filter: if any kind flag is set, only allow matching kind
+                    val kindActive = f.kindFields || f.kindMethods
+                    if (kindActive) {
+                        if (m is FieldInfo && !f.kindFields) return@filter false
+                        if (m is MethodInfo && !f.kindMethods) return@filter false
                     }
 
-                    // kind filter for methods
-                    when (f.kindMethods) {
-                        MainViewModel.TriState.EXCLUDE -> return@filter false
-                        MainViewModel.TriState.INCLUDE -> { }
-                        else -> { }
-                    }
-
-                    if (f.isStatic == MainViewModel.TriState.INCLUDE && !java.lang.reflect.Modifier.isStatic(acc.modifiers)) return@filter false
-                    if (f.isStatic == MainViewModel.TriState.EXCLUDE && java.lang.reflect.Modifier.isStatic(acc.modifiers)) return@filter false
-                    if (f.isFinal == MainViewModel.TriState.INCLUDE && !java.lang.reflect.Modifier.isFinal(acc.modifiers)) return@filter false
-                    if (f.isFinal == MainViewModel.TriState.EXCLUDE && java.lang.reflect.Modifier.isFinal(acc.modifiers)) return@filter false
+                    // static/final tri-state checks
+                    if (!triMatches(mods, f.isStatic) { Modifier.isStatic(it) }) return@filter false
+                    if (!triMatches(mods, f.isFinal) { Modifier.isFinal(it) }) return@filter false
 
                     true
                 }
+
                 else -> true
             }
         }

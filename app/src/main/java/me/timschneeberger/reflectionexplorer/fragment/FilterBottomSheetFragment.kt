@@ -5,11 +5,8 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.lifecycle.ViewModelProvider
-import com.google.android.material.bottomsheet.BottomSheetBehavior
-import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.chip.Chip
-import com.google.android.material.snackbar.Snackbar
 import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.databinding.BottomSheetFiltersBinding
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
@@ -26,101 +23,70 @@ class FilterBottomSheetFragment : BottomSheetDialogFragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         binding = BottomSheetFiltersBinding.inflate(inflater, container, false)
         vm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
-
         return binding.root
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        // helper to update chip visuals for tri-state
-        fun applyState(chip: Chip, state: MainViewModel.TriState) {
-            when (state) {
-                MainViewModel.TriState.DEFAULT -> {
-                    chip.isChecked = false
-                    chip.chipIcon = null
-                }
-                MainViewModel.TriState.INCLUDE -> {
-                    chip.isChecked = true
-                    chip.setCheckedIconResource(R.drawable.ic_check)
-                }
-                MainViewModel.TriState.EXCLUDE -> {
-                    chip.isChecked = true
-                    chip.setCheckedIconResource(R.drawable.ic_close)
-                }
-            }
+        // helpers
+        fun Chip.setTri(state: MainViewModel.TriState) = when (state) {
+            MainViewModel.TriState.DEFAULT -> apply { isChecked = false; chipIcon = null }
+            MainViewModel.TriState.INCLUDE -> apply { isChecked = true; setCheckedIconResource(R.drawable.ic_check) }
+            MainViewModel.TriState.EXCLUDE -> apply { isChecked = true; setCheckedIconResource(R.drawable.ic_close) }
         }
 
-        // initialize with vm state
-        val f = vm.memberFilter
-        applyState(binding.visibilityPublic, f.visibilityPublic)
-        applyState(binding.visibilityProtected, f.visibilityProtected)
-        applyState(binding.visibilityPrivate, f.visibilityPrivate)
+        fun Chip.setBin(flag: Boolean) = apply { isChecked = flag; chipIcon = null }
 
-        applyState(binding.kindMethods, f.kindMethods)
-        applyState(binding.kindFields, f.kindFields)
-
-        applyState(binding.modStatic, f.isStatic)
-        applyState(binding.modFinal, f.isFinal)
-
-        // cycle helper
-        fun next(s: MainViewModel.TriState) = when (s) {
+        fun nextTri(s: MainViewModel.TriState) = when (s) {
             MainViewModel.TriState.DEFAULT -> MainViewModel.TriState.INCLUDE
             MainViewModel.TriState.INCLUDE -> MainViewModel.TriState.EXCLUDE
             MainViewModel.TriState.EXCLUDE -> MainViewModel.TriState.DEFAULT
         }
 
-        // attach cycling on chips (examples per property)
-        binding.visibilityPublic.setOnClickListener {
-            f.visibilityPublic = next(f.visibilityPublic)
-            applyState(binding.visibilityPublic, f.visibilityPublic)
-        }
-        binding.visibilityProtected.setOnClickListener {
-            f.visibilityProtected = next(f.visibilityProtected)
-            applyState(binding.visibilityProtected, f.visibilityProtected)
-        }
-        binding.visibilityPrivate.setOnClickListener {
-            f.visibilityPrivate = next(f.visibilityPrivate)
-            applyState(binding.visibilityPrivate, f.visibilityPrivate)
-        }
-
-        binding.kindMethods.setOnClickListener {
-            f.kindMethods = next(f.kindMethods)
-            applyState(binding.kindMethods, f.kindMethods)
-        }
-        binding.kindFields.setOnClickListener {
-            f.kindFields = next(f.kindFields)
-            applyState(binding.kindFields, f.kindFields)
-        }
-
-        binding.modStatic.setOnClickListener {
-            f.isStatic = next(f.isStatic)
-            applyState(binding.modStatic, f.isStatic)
-        }
-        binding.modFinal.setOnClickListener {
-            f.isFinal = next(f.isFinal)
-            applyState(binding.modFinal, f.isFinal)
-        }
-
-        binding.filtersReset.setOnClickListener {
-            vm.memberFilter.apply {
-                visibilityPublic = MainViewModel.TriState.DEFAULT
-                visibilityProtected = MainViewModel.TriState.DEFAULT
-                visibilityPrivate = MainViewModel.TriState.DEFAULT
-                isStatic = MainViewModel.TriState.DEFAULT
-                isFinal = MainViewModel.TriState.DEFAULT
-                kindMethods = MainViewModel.TriState.DEFAULT
-                kindFields = MainViewModel.TriState.DEFAULT
+        // Helper binders
+        fun bindBinary(chip: Chip, getter: () -> Boolean, setter: (Boolean) -> Unit) {
+            chip.setOnClickListener {
+                setter(!getter())
+                vm.memberFilterLive.postValue(vm.memberFilter)
             }
-            // publish changes so observers update immediately
-            vm.memberFilterLive.postValue(vm.memberFilter)
-            dismiss()
         }
 
-        binding.filtersApply.setOnClickListener {
-            // publish changes so observers update immediately
-            vm.memberFilterLive.postValue(vm.memberFilter)
-            dismiss()
+        fun bindTriState(chip: Chip, getter: () -> MainViewModel.TriState, setter: (MainViewModel.TriState) -> Unit) {
+            chip.setOnClickListener {
+                setter(nextTri(getter()))
+                vm.memberFilterLive.postValue(vm.memberFilter)
+            }
+        }
+
+        // keep UI in sync with ViewModel
+        vm.memberFilterLive.observe(viewLifecycleOwner) { f ->
+            binding.apply {
+                visibilityPublic.setBin(f.visibilityPublic)
+                visibilityProtected.setBin(f.visibilityProtected)
+                visibilityPrivate.setBin(f.visibilityPrivate)
+                visibilityPackage.setBin(f.visibilityPackage)
+
+                kindMethods.setBin(f.kindMethods)
+                kindFields.setBin(f.kindFields)
+
+                modStatic.setTri(f.isStatic)
+                modFinal.setTri(f.isFinal)
+            }
+        }
+
+        // wire interactions concisely using the bind helpers
+        binding.apply {
+            bindBinary(visibilityPublic, { vm.memberFilter.visibilityPublic }, { vm.memberFilter.visibilityPublic = it })
+            bindBinary(visibilityProtected, { vm.memberFilter.visibilityProtected }, { vm.memberFilter.visibilityProtected = it })
+            bindBinary(visibilityPrivate, { vm.memberFilter.visibilityPrivate }, { vm.memberFilter.visibilityPrivate = it })
+            bindBinary(visibilityPackage, { vm.memberFilter.visibilityPackage }, { vm.memberFilter.visibilityPackage = it })
+
+            bindBinary(kindMethods, { vm.memberFilter.kindMethods }, { vm.memberFilter.kindMethods = it })
+            bindBinary(kindFields, { vm.memberFilter.kindFields }, { vm.memberFilter.kindFields = it })
+
+            bindTriState(modStatic, { vm.memberFilter.isStatic }, { vm.memberFilter.isStatic = it })
+            bindTriState(modFinal, { vm.memberFilter.isFinal }, { vm.memberFilter.isFinal = it })
         }
     }
 }
