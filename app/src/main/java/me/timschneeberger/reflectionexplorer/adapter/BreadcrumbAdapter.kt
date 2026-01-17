@@ -14,18 +14,44 @@ class BreadcrumbAdapter(
 
     class VH(val binding: ItemBreadcrumbBinding) : RecyclerView.ViewHolder(binding.root)
 
+    private var rvRef: RecyclerView? = null
+    private var pendingUpdate: Pair<List<String>, Int>? = null
+
+    override fun onAttachedToRecyclerView(recyclerView: RecyclerView) {
+        super.onAttachedToRecyclerView(recyclerView)
+        rvRef = recyclerView
+        // If there's a pending update from while computing layout, apply it now
+        pendingUpdate?.let { (items, sel) ->
+            pendingUpdate = null
+            update(items, sel)
+        }
+    }
+
+    override fun onDetachedFromRecyclerView(recyclerView: RecyclerView) {
+        super.onDetachedFromRecyclerView(recyclerView)
+        rvRef = null
+        pendingUpdate = null
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH =
         VH(ItemBreadcrumbBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
     override fun onBindViewHolder(holder: VH, position: Int) {
         val label = items.getOrNull(position) ?: ""
         holder.binding.breadcrumbChip.apply {
+            // avoid triggering previous listeners when changing checked state
+            setOnCheckedChangeListener(null)
             text = if (position < items.size - 1) "$label ›" else label
             isCheckable = true
             isChecked = position == selectedIndex
-            setOnCheckedChangeListener { _, _ ->
-                if (position == selectedIndex)
-                    holder.binding.breadcrumbChip.isChecked = true
+            setOnCheckedChangeListener { _, checked ->
+                if (!checked) return@setOnCheckedChangeListener
+                // if already selected, keep checked and do nothing
+                if (position == selectedIndex) {
+                    // ensure visual remains checked without invoking onClick
+                    this@apply.post { this@apply.isChecked = true }
+                    return@setOnCheckedChangeListener
+                }
                 onClick(position)
             }
         }
@@ -34,6 +60,14 @@ class BreadcrumbAdapter(
     override fun getItemCount(): Int = items.size
 
     fun update(newItems: List<String>, newSelectedIndex: Int = newItems.size - 1) {
+        // If RecyclerView is computing layout, defer the update to avoid IllegalStateException
+        val rv = rvRef
+        if (rv?.isComputingLayout == true) {
+            pendingUpdate = newItems to newSelectedIndex
+            rv.post { pendingUpdate?.let { (i, s) -> pendingUpdate = null; update(i, s) } }
+            return
+        }
+
         val oldItems = items
         val oldSelected = selectedIndex
         val coercedSelected = if (newItems.isEmpty()) 0 else newSelectedIndex.coerceIn(0, newItems.size - 1)
