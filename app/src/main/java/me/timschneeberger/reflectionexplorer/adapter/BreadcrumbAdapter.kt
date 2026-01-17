@@ -44,9 +44,7 @@ class BreadcrumbAdapter(
             text = if (position < items.size - 1) "$label ›" else label
             isCheckable = true
             isChecked = position == selectedIndex
-            setOnCheckedChangeListener { _, checked ->
-                if (!checked) return@setOnCheckedChangeListener
-                // if already selected, keep checked and do nothing
+            setOnCheckedChangeListener { _, _ ->
                 if (position == selectedIndex) {
                     // ensure visual remains checked without invoking onClick
                     this@apply.post { this@apply.isChecked = true }
