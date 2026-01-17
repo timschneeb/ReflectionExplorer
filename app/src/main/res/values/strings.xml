@@ -3,4 +3,7 @@
     <string name="collection_size">Collection: size=%1$d</string>
     <string name="array_size">Array: size=%1$d</string>
     <string name="map_size">Map: size=%1$d</string>
+    <string name="action_reevaluate">Re-evaluate field</string>
+    <string name="action_set_value">Set field value</string>
+    <string name="action_refresh">Refresh</string>
 </resources>

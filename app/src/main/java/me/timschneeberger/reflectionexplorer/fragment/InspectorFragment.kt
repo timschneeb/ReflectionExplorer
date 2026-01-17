@@ -225,4 +225,12 @@ class InspectorFragment : Fragment() {
             }
         }
     }
+
+    fun refreshMembers() {
+        val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
+        val inst = mainVm.inspectionStack.getOrNull(argIndex) ?: return
+        var updated = ReflectionInspector.listMembers(inst)
+        updated = applyFilters(updated, ViewModelProvider(requireActivity())[MainViewModel::class.java])
+        membersAdapter?.update(updated)
+    }
 }

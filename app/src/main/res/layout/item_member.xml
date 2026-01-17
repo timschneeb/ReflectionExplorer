@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/member_container"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -46,6 +47,24 @@
                 android:textColor="?attr/colorOnSurfaceVariant"
                 android:maxLines="2"
                 android:ellipsize="end" />
+
+        </LinearLayout>
+
+        <!-- Right-aligned Material icon buttons for field actions -->
+        <LinearLayout
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:gravity="center_vertical">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_set"
+                style="?attr/materialIconButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/action_set_value"
+                app:icon="@drawable/ic_edit"
+                android:visibility="gone" />
 
         </LinearLayout>
 

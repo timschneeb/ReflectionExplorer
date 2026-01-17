@@ -2,6 +2,8 @@ package me.timschneeberger.reflectionexplorer
 
 import android.os.Bundle
 import android.text.InputType
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
@@ -68,6 +70,9 @@ class MainActivity : AppCompatActivity() {
 
             // Post breadcrumb refresh to avoid modifying FragmentManager while it is executing transactions.
             binding.root.post { (supportFragmentManager.findFragmentById(R.id.container) as? InspectorFragment)?.refreshBreadcrumb() }
+
+            // update toolbar menu (refresh action visibility)
+            invalidateOptionsMenu()
         }
 
         binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
@@ -93,6 +98,8 @@ class MainActivity : AppCompatActivity() {
         val idx = vm.inspectionStack.size - 1
         InspectorFragment.newInstance(idx).also { fragment ->
             supportFragmentManager.beginTransaction().replace(R.id.container, fragment).addToBackStack(null).commit()
+            // menu should update to show inspector actions
+            invalidateOptionsMenu()
         }
     }
 
@@ -112,6 +119,61 @@ class MainActivity : AppCompatActivity() {
             ReflectionInspector.getField(instance, field)?.let { openInspectorFor(it) } ?: run { detailsText.text = "Member value is null" }
         } catch (e: Exception) {
             detailsText.text = "Error: ${e.message}"
+        }
+    }
+
+    // Show a dialog to set a field value. callback receives (success, errorMessage?)
+    fun showSetFieldDialog(instance: Any, fieldInfo: FieldInfo, callback: (Boolean, String?) -> Unit) {
+        val field = fieldInfo.field
+        val ctx = this
+        val til = TextInputLayout(ctx)
+        val input = TextInputEditText(ctx)
+        input.hint = "New value for ${field.name} (${field.type.simpleName})"
+        til.addView(input)
+
+        val dialog = MaterialAlertDialogBuilder(ctx)
+            .setTitle("Set ${field.name}")
+            .setView(til)
+            .setPositiveButton("Set", null)
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        dialog.show()
+        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val text = input.text?.toString() ?: ""
+            try {
+                val parsed = parseSimpleInput(text, field.type)
+                ReflectionInspector.setField(instance, field, parsed)
+                callback(true, null)
+                dialog.dismiss()
+            } catch (e: Exception) {
+                callback(false, e.message)
+            }
+        }
+    }
+
+    private fun parseSimpleInput(text: String, type: Class<*>): Any {
+        return when (type) {
+            String::class.java -> text
+            Int::class.java, Integer.TYPE -> text.toInt()
+            Long::class.java, java.lang.Long.TYPE -> text.toLong()
+            java.lang.Boolean::class.java, java.lang.Boolean.TYPE -> when (text.lowercase()) { "true" -> true; else -> false }
+            Double::class.java, java.lang.Double.TYPE -> text.toDouble()
+            else -> throw IllegalArgumentException("Unsupported field type: ${type.simpleName}")
+        }
+    }
+
+    companion object {
+        fun canParseType(type: Class<*>): Boolean {
+            return when (type) {
+                String::class.java,
+                Int::class.java, Integer.TYPE,
+                Long::class.java, java.lang.Long.TYPE,
+                java.lang.Boolean::class.java, java.lang.Boolean.TYPE,
+                Double::class.java, java.lang.Double.TYPE -> true
+
+                else -> false
+            }
         }
     }
 
@@ -439,5 +501,31 @@ class MainActivity : AppCompatActivity() {
             if ((c as Enum<*>).name == name) return c
         }
         return null
+    }
+
+    override fun onCreateOptionsMenu(menu: Menu?): Boolean {
+        menuInflater.inflate(R.menu.menu_inspector, menu)
+        // Initially hide refresh action unless inspector is shown
+        menu?.findItem(R.id.action_refresh_fields)?.isVisible = supportFragmentManager.findFragmentById(R.id.container) is InspectorFragment
+        return true
+    }
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            R.id.action_refresh_fields -> {
+                performRefreshFields()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    private fun performRefreshFields() {
+        // Notify current InspectorFragment to refresh values (this will re-fetch field values and update adapter)
+        val frag = supportFragmentManager.findFragmentById(R.id.container) as? InspectorFragment
+        frag?.let {
+            // re-run member listing update via fragment's lifecycle observer - expose a method on InspectorFragment
+            it.refreshMembers()
+        }
     }
 }

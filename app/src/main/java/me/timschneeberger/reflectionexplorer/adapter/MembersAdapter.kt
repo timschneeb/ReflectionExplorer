@@ -2,10 +2,13 @@ package me.timschneeberger.reflectionexplorer.adapter
 
 import android.annotation.SuppressLint
 import android.view.LayoutInflater
+import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
+import me.timschneeberger.reflectionexplorer.MainActivity
 import me.timschneeberger.reflectionexplorer.utils.ClassHeaderInfo
 import me.timschneeberger.reflectionexplorer.utils.ElementInfo
 import me.timschneeberger.reflectionexplorer.utils.FieldInfo
@@ -130,6 +133,25 @@ class MembersAdapter(
                 "${item.field.type.simpleName} -> ${formatPreview(v = v)}"
             } catch (_: Exception) { "<error>" }
             memberIcon.setImageDrawable(item.field.getFieldDrawable(root.context))
+
+            btnSet.isVisible = MainActivity.canParseType(item.field.type)
+            btnSet.setOnClickListener {
+                val ctx = root.context
+                (ctx as? MainActivity)?.let { act ->
+                    act.showSetFieldDialog(rootInstance, item) { ok, errMsg ->
+                        if (ok) {
+                            // refresh after successful set
+                            try {
+                                val newV = ReflectionInspector.getField(rootInstance, item.field)
+                                memberSubtitle.text = "${item.field.type.simpleName} -> ${formatPreview(v = newV)}"
+                            } catch (_: Exception) { /* ignore */ }
+                        } else if (errMsg != null) {
+                            memberSubtitle.text = "<error: $errMsg>"
+                        }
+                    }
+                }
+            }
+
             root.setOnClickListener { onClick(item) }
         }
     }
@@ -138,8 +160,9 @@ class MembersAdapter(
         hv.binding.apply {
             val params = item.method.parameterTypes.joinToString(",") { it.simpleName }
             memberTitle.text = "${item.name}($params)"
-            memberSubtitle.text = "=> ${item.method.returnType.simpleName}"
+            memberSubtitle.text = "-> ${item.method.returnType.simpleName}"
             memberIcon.setImageDrawable(item.method.getMethodDrawable(root.context) ?: ContextCompat.getDrawable(root.context, R.drawable.ic_method))
+            btnSet.isVisible = false
             root.setOnClickListener { onClick(item) }
         }
     }
@@ -149,6 +172,7 @@ class MembersAdapter(
             memberTitle.text = item.name
             memberSubtitle.text = item.value?.let { it::class.java.simpleName + " -> " + preview } ?: "null"
             memberIcon.setImageResource(R.drawable.ic_class)
+            btnSet.isVisible = false
             root.setOnClickListener { onClick(item) }
         }
     }
@@ -158,6 +182,7 @@ class MembersAdapter(
             memberTitle.text = item.key
             memberSubtitle.text = item.value?.let { it::class.java.simpleName + " -> " + preview } ?: "null"
             memberIcon.setImageResource(R.drawable.ic_field)
+            btnSet.isVisible = false
             root.setOnClickListener { onClick(item) }
         }
     }
