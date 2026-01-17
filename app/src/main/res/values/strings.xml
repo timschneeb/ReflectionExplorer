@@ -1,3 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">ReflectionExplorer</string>
     <string name="collection_size">%1$d items</string>
@@ -13,4 +14,18 @@
     <string name="member_signature" translatable="false">%1$s(%2$s)</string>
     <string name="method_return">-> %1$s</string>
     <string name="header_title">%1$s (%2$d)</string>
+
+    <string name="ok">OK</string>
+    <string name="cancel">Cancel</string>
+    <string name="set_field_title">Set %1$s</string>
+    <string name="set_field_hint">New value for %1$s (%2$s)</string>
+    <string name="invoke_title">Invoke %1$s</string>
+    <string name="invoked_result">Invoked %1$s -> %2$s</string>
+    <string name="invoke_error">Error invoking: %1$s</string>
+    <string name="preview_label">Preview: %1$s</string>
+    <string name="enter_element_class">Enter element class (e.g. java.lang.Integer)</string>
+    <string name="could_not_load_class">Could not load %1$s, using String</string>
+    <string name="enter_value">Enter value</string>
+    <string name="use_array_hint">Use [a,b] or {k:v}</string>
+    <string name="invoke">Invoke</string>
 </resources>
