@@ -27,7 +27,6 @@ import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector.formatPre
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
 import me.timschneeberger.reflectionexplorer.utils.getFieldDrawable
 import me.timschneeberger.reflectionexplorer.utils.getMethodDrawable
-import java.lang.reflect.Array
 
 private const val TYPE_HEADER = 0
 private const val TYPE_MEMBER = 1
@@ -43,81 +42,15 @@ class MembersAdapter(
     private val onClick: (MemberInfo) -> Unit
 ) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
+    init { rebuildVisible() }
+
     private var fullItems: List<MemberInfo> = items
     private var visibleItems: MutableList<MemberInfo> = mutableListOf()
 
-    init { rebuildVisible() }
-
-    // Small helpers to reduce duplication
-    private fun isList(): Boolean = rootInstance is List<*>
-    private fun asList(): List<Any?>? = rootInstance as? List<Any?>
-
-    private fun isMap(): Boolean = rootInstance is Map<*, *>
-
-    private fun isArray(): Boolean = try { rootInstance.javaClass.isArray } catch (_: Exception) { false }
-    private fun arrayLength(): Int = try { if (isArray()) ReflectionInspector.getArrayLength(rootInstance) else 0 } catch (_: Exception) { 0 }
-
-    private fun boxPrimitive(c: Class<*>?): Class<*>? {
-        if (c == null) return null
-        if (!c.isPrimitive) return c
-        return when (c) {
-            java.lang.Integer.TYPE -> Integer::class.java
-            java.lang.Long.TYPE -> java.lang.Long::class.java
-            java.lang.Boolean.TYPE -> java.lang.Boolean::class.java
-            java.lang.Double.TYPE -> java.lang.Double::class.java
-            java.lang.Float.TYPE -> java.lang.Float::class.java
-            java.lang.Character.TYPE -> java.lang.Character::class.java
-            java.lang.Byte.TYPE -> java.lang.Byte::class.java
-            java.lang.Short.TYPE -> java.lang.Short::class.java
-            else -> c
-        }
-    }
-
-    private fun replaceStack(activity: MainActivity, newValue: Any) {
+    private fun replaceStack(activity: MainActivity, newValue: Any) =
         activity.replaceStackAt(stackIndex, newValue)
-    }
-
-    // Helper: safely get MainActivity from a view and run an action
-    private fun runWithActivity(anchor: View, block: (MainActivity) -> Unit) {
-        val act = anchor.context as? MainActivity ?: return
-        block(act)
-    }
-
-    private fun performDelete(activity: MainActivity, item: MemberInfo) {
-        if (item is CollectionMember) {
-            val newRoot = item.applyDelete(rootInstance)
-            if (newRoot != null) activity.replaceStackAt(stackIndex, newRoot)
-        }
-    }
-
-    private fun performEdit(activity: MainActivity, item: MemberInfo, anchor: View) {
-        when (item) {
-            is FieldInfo -> activity.showSetFieldDialog(rootInstance, item) { ok, _ -> if (ok) replaceStack(activity, rootInstance) }
-            is CollectionMember -> {
-                val value = item.getValue(rootInstance)?.toString() ?: ""
-                val type = item.getType(rootInstance)
-
-                if (type == Any::class.java) {
-                    // cannot determine element type for editing
-                    Snackbar.make(anchor, "Cannot determine element type to edit", Snackbar.LENGTH_SHORT).show()
-                    return
-                }
-
-                Dialogs.showEditValueDialog(activity, activity.getString(R.string.action_set_value),
-                    activity.getString(R.string.action_set_value),
-                    value, type, null, null, anchor) { ok, parsed, _ ->
-                    if (!ok || parsed == null) return@showEditValueDialog
-                    val newRoot = item.applyEdit(rootInstance, parsed)
-                    if (newRoot != null) activity.replaceStackAt(stackIndex, newRoot)
-                }
-            }
-            else -> {
-                // no-op for other types (e.g., Method invocation is handled elsewhere)
-            }
-        }
-    }
-
-    // Element/map mutation helpers moved into ReflectionInspector; adapter calls those through performEdit/performDelete.
+    private fun runWithActivity(anchor: View, block: (MainActivity) -> Unit) =
+        (anchor.context as? MainActivity)?.let(block)
 
     class VH(val binding: ItemMemberBinding) : RecyclerView.ViewHolder(binding.root)
     class HeaderVH(val binding: ItemMemberHeaderBinding) : RecyclerView.ViewHolder(binding.root)
@@ -175,7 +108,7 @@ class MembersAdapter(
                      memberSubtitle.text = try {
                          val v = ReflectionInspector.getField(rootInstance, item.field)
                          if (v == null) root.context.getString(R.string.member_value_null) else item.field.type.simpleName + " -> " + formatPreview(root.context, v)
-                     } catch (_: Exception) { root.context.getString(R.string.error_prefix, "") }
+                     } catch (e: Exception) { root.context.getString(R.string.error_prefix, e)}
                      memberIcon.setImageDrawable(item.field.getFieldDrawable(root.context))
 
                      btnSet.isVisible = Dialogs.canParseType(item.field.type)
@@ -190,16 +123,17 @@ class MembersAdapter(
                  }
 
                  is ElementInfo -> {
-                     memberTitle.text = item.name
                      val currentValue: Any? = (item as CollectionMember).getValue(rootInstance)
+
+                     memberTitle.text = item.name
                      memberIcon.setImageResource(R.drawable.ic_class)
                      memberSubtitle.text = currentValue?.let { root.context.getString(R.string.member_value_format, it::class.java.simpleName, formatPreview(root.context, it)) } ?: root.context.getString(R.string.element_is_null)
 
                      // Determine whether this element is editable (allow editing arrays even when element is null by checking component type)
                      btnSet.isVisible = Dialogs.canParseType(item.getType(rootInstance))
                      btnDelete.isVisible = when {
-                         isList() -> item.index in 0 until (asList()?.size ?: 0)
-                         isArray() -> item.index in 0 until arrayLength()
+                         rootInstance is List<*> -> item.index in 0 until ((rootInstance as? List<Any?>)?.size ?: 0)
+                         rootInstance.javaClass.isArray -> item.index in 0 until ReflectionInspector.getArrayLength(rootInstance)
                          else -> false
                      }
 
@@ -208,22 +142,21 @@ class MembersAdapter(
                  }
 
                  is MapEntryInfo -> {
-                     memberTitle.text = item.key?.toString() ?: ""
                      val currentValue = (item as CollectionMember).getValue(rootInstance)
+
+                     memberTitle.text = item.key?.toString() ?: ""
                      memberSubtitle.text = currentValue?.let { root.context.getString(R.string.member_value_format, it::class.java.simpleName, formatPreview(root.context, it)) } ?: root.context.getString(R.string.member_value_null)
                      memberIcon.setImageResource(R.drawable.ic_field)
 
-                     val canDelete = isMap()
-                     val canEdit = currentValue != null && Dialogs.canParseType(currentValue::class.java)
-                     btnDelete.isVisible = canDelete
-                     btnSet.isVisible = canEdit
+                     btnDelete.isVisible = rootInstance is Map<*, *>
+                     btnSet.isVisible = currentValue != null && Dialogs.canParseType(currentValue::class.java)
 
                      btnDelete.setOnClickListener { runWithActivity(root) { act -> performDelete(act, item) } }
                      btnSet.setOnClickListener { runWithActivity(root) { act -> performEdit(act, item, root) } }
                  }
 
                  else -> {
-                     // unknown MemberInfo implementation - no-op
+                     throw IllegalArgumentException("Unknown MemberInfo type: ${item::class.java.name}")
                  }
              }
 
@@ -256,6 +189,39 @@ class MembersAdapter(
         rebuildVisible()
         notifyDataSetChanged()
     }
+
+    private fun performDelete(activity: MainActivity, item: MemberInfo) {
+        if (item is CollectionMember) {
+            val newRoot = item.applyDelete(rootInstance)
+            if (newRoot != null) activity.replaceStackAt(stackIndex, newRoot)
+        }
+    }
+
+    private fun performEdit(activity: MainActivity, item: MemberInfo, anchor: View) {
+        when (item) {
+            is FieldInfo -> activity.showSetFieldDialog(rootInstance, item) { ok, _ -> if (ok) replaceStack(activity, rootInstance) }
+            is CollectionMember -> {
+                val value = item.getValue(rootInstance)?.toString() ?: ""
+                val type = item.getType(rootInstance)
+
+                if (type == Any::class.java) {
+                    // cannot determine element type for editing
+                    Snackbar.make(anchor, "Cannot determine element type to edit", Snackbar.LENGTH_SHORT).show()
+                    return
+                }
+
+                Dialogs.showEditValueDialog(activity, activity.getString(R.string.action_set_value),
+                    activity.getString(R.string.action_set_value),
+                    value, type, null, null, anchor) { ok, parsed, _ ->
+                    if (!ok || parsed == null) return@showEditValueDialog
+                    val newRoot = item.applyEdit(rootInstance, parsed)
+                    if (newRoot != null) activity.replaceStackAt(stackIndex, newRoot)
+                }
+            }
+            else -> {}
+        }
+    }
+
 
     private fun rebuildVisible() {
         visibleItems.clear()

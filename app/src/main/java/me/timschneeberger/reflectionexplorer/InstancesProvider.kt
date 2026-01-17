@@ -1,5 +1,7 @@
 package me.timschneeberger.reflectionexplorer
 
+import java.util.Optional
+
 // Some sample classes to inspect
 data class Person(var name: String, var age: Int, var address: Address?)
 
@@ -20,6 +22,7 @@ class TestData {
     val floatNum = 3.14f
     val doubleNum = 2.71828
     val sampleList = listOf("alpha", "beta", "gamma")
+    val genericTest = Optional.empty<String>()
 }
 
 object InstancesProvider {

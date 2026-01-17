@@ -145,11 +145,11 @@ class InspectorFragment : Fragment() {
                             val added = try {
                                 ml.add(parsed)
                                 true
-                            } catch (e: UnsupportedOperationException) {
-                                false
                             } catch (e: Exception) {
+                                e.printStackTrace()
                                 false
                             }
+
                             if (added) {
                                 // mutated in-place
                                 activity.replaceStackAt(argIndex, inst)
@@ -172,7 +172,7 @@ class InspectorFragment : Fragment() {
                             @Suppress("UNCHECKED_CAST")
                             val mapView = inst as Map<Any?, Any?>
                             val newMap = LinkedHashMap(mapView)
-                            val newKey = "key${newMap.size}"
+                            val newKey = "key${newMap.size + 1}"
                             newMap[newKey] = parsed
                             activity.replaceStackAt(argIndex, newMap)
                         }
