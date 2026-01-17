@@ -1,8 +1,6 @@
 <resources>
     <string name="app_name">ReflectionExplorer</string>
-    <string name="collection_size">List: %1$d items</string>
-    <string name="array_size">Array: %1$d items</string>
-    <string name="map_size">Map: %1$d items</string>
+    <string name="collection_size">%1$d items</string>
     <string name="action_reevaluate">Re-evaluate field</string>
     <string name="action_set_value">Set field value</string>
     <string name="action_refresh">Refresh</string>

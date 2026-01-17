@@ -1,5 +1,7 @@
 package me.timschneeberger.reflectionexplorer.utils
 
+import android.content.Context
+import me.timschneeberger.reflectionexplorer.R
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.Array as JArray
@@ -80,6 +82,35 @@ class MapEntryInfo(name: String, val key: Any?, val value: Any?) : MemberInfo(na
 class ClassHeaderInfo(val cls: Class<*>) : MemberInfo(cls.simpleName)
 
 object ReflectionInspector {
+    fun formatPreview(ctx: Context, v: Any?): String = try {
+        when (v) {
+            null -> "null"
+            is CharSequence -> v.toString().let { s -> if (s.length > 80) "\"${s.take(80)}...\" (len=${s.length})" else "\"$s\"" }
+            is Collection<*> -> run {
+                val kind = if (v is List<*>) "List" else "Collection"
+                val elemName = v.firstOrNull { it != null }?.javaClass?.simpleName ?: "Any"
+                // e.g. List<String> size=3
+                "$kind<$elemName> ${ctx.getString(R.string.collection_size, v.size)}"
+            }
+            is Map<*, *> -> run {
+                val keyName = v.keys.firstOrNull { it != null }?.javaClass?.simpleName ?: "Any"
+                val valName = v.values.firstOrNull { it != null }?.javaClass?.simpleName ?: "Any"
+                "Map<$keyName, $valName> ${ctx.getString(R.string.collection_size, v.size)}"
+            }
+            else -> {
+                val cls = v.javaClass
+                if (cls.isArray) {
+                    ctx.getString(R.string.collection_size, JArray.getLength(v))
+                } else {
+                    v.toString().let { s -> if (s.length > 120) "${s.take(120)}... (len=${s.length})" else s }
+                }
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        "<error>"
+    }
+
     // Internal helpers to consolidate mutation logic for elements and maps
     @Suppress("UNCHECKED_CAST", "USELESS_CAST")
     internal fun deleteElementInternal(rootInstance: Any, index: Int): Any? {

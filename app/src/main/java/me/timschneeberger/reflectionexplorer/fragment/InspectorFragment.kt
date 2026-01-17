@@ -26,6 +26,7 @@ import me.timschneeberger.reflectionexplorer.utils.MapEntryInfo
 import me.timschneeberger.reflectionexplorer.utils.MethodInfo
 import me.timschneeberger.reflectionexplorer.utils.MemberInfo
 import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector
+import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector.formatPreview
 import java.lang.reflect.Modifier
 
 private const val ARG_STACK_INDEX = "arg_stack_index"
@@ -298,17 +299,8 @@ class InspectorFragment : Fragment() {
 
     private fun updateCollectionChip(inst: Any) {
         binding.collectionInfoChip.apply {
-            when (inst) {
-                is Collection<*> -> { text = getString(R.string.collection_size, inst.size); visibility = View.VISIBLE }
-                else -> {
-                    val cls = inst.javaClass
-                    when {
-                        cls.isArray -> { text = getString(R.string.array_size, ReflectionInspector.getArrayLength(inst)); visibility = View.VISIBLE }
-                        inst is Map<*, *> -> { text = getString(R.string.map_size, inst.size); visibility = View.VISIBLE }
-                        else -> visibility = View.GONE
-                    }
-                }
-            }
+            text = formatPreview(requireContext(), inst)
+            visibility = if(inst is Collection<*> || inst.javaClass.isArray || inst is Map<*, *>) View.VISIBLE else View.GONE
         }
     }
 }

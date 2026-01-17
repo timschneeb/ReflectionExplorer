@@ -23,6 +23,7 @@ import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberHeaderBinding
 import me.timschneeberger.reflectionexplorer.utils.Dialogs
+import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector.formatPreview
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
 import me.timschneeberger.reflectionexplorer.utils.getFieldDrawable
 import me.timschneeberger.reflectionexplorer.utils.getMethodDrawable
@@ -229,24 +230,6 @@ class MembersAdapter(
              root.setOnClickListener { onClick(item) }
          }
      }
-
-     private fun formatPreview(ctx: Context, v: Any?): String = try {
-         when (v) {
-             null -> "null"
-             is CharSequence -> v.toString().let { s -> if (s.length > 80) "\"${s.take(80)}...\" (len=${s.length})" else "\"$s\"" }
-             is Collection<*> -> ctx.getString(R.string.collection_size, v.size)
-             is Map<*, *> -> ctx.getString(R.string.map_size, v.size)
-             else -> {
-                 val cls = v.javaClass
-                 if (cls.isArray) {
-                     ctx.getString(R.string.array_size, Array.getLength(v))
-                 } else {
-                     v.toString().let { s -> if (s.length > 120) "${s.take(120)}... (len=${s.length})" else s }
-                 }
-             }
-         }
-     } catch (_: Exception) { "<error>" }
-
 
     private fun bindHeader(hv: HeaderVH, item: ClassHeaderInfo) {
         val pkg = item.cls.`package`?.name ?: "<default>"
