@@ -1,8 +1,8 @@
 <resources>
     <string name="app_name">ReflectionExplorer</string>
-    <string name="collection_size">Collection: size=%1$d</string>
-    <string name="array_size">Array: size=%1$d</string>
-    <string name="map_size">Map: size=%1$d</string>
+    <string name="collection_size">List: %1$d items</string>
+    <string name="array_size">Array: %1$d items</string>
+    <string name="map_size">Map: %1$d items</string>
     <string name="action_reevaluate">Re-evaluate field</string>
     <string name="action_set_value">Set field value</string>
     <string name="action_refresh">Refresh</string>
@@ -12,7 +12,6 @@
     <string name="member_value_null">Member value is null</string>
     <string name="element_is_null">Element is null</string>
     <string name="error_prefix">Error: %1$s</string>
-    <!-- Extracted/templated strings -->
     <string name="member_signature" translatable="false">%1$s(%2$s)</string>
     <string name="method_return">-> %1$s</string>
     <string name="header_title">%1$s (%2$d)</string>

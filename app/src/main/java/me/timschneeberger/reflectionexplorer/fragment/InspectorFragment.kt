@@ -36,10 +36,6 @@ class InspectorFragment : Fragment() {
     private var bcAdapter: BreadcrumbAdapter? = null
     private lateinit var binding: FragmentInspectorBinding
 
-    // store original tint values so we can restore them when not highlighted
-    private var filterButtonBgDefault: ColorStateList? = null
-    private var filterButtonIconDefault: ColorStateList? = null
-
     // make adapter a property so we can update it from observers
     private var membersAdapter: MembersAdapter? = null
 
@@ -86,19 +82,7 @@ class InspectorFragment : Fragment() {
         val inst = instance ?: return binding.root
 
         // collection info chip (moved after inst is known to avoid null assertions)
-        binding.collectionInfoChip.apply {
-            when (inst) {
-                is Collection<*> -> { text = getString(R.string.collection_size, inst.size); visibility = View.VISIBLE }
-                else -> {
-                    val cls = inst.javaClass
-                    when {
-                        cls.isArray -> { text = getString(R.string.array_size, ReflectionInspector.getArrayLength(inst)); visibility = View.VISIBLE }
-                        inst is Map<*, *> -> { text = getString(R.string.map_size, inst.size); visibility = View.VISIBLE }
-                        else -> visibility = View.GONE
-                    }
-                }
-            }
-        }
+        updateCollectionChip(inst)
 
         val membersRaw = ReflectionInspector.listMembers(inst)
         val members = applyFilters(membersRaw, mainVm)
@@ -285,5 +269,23 @@ class InspectorFragment : Fragment() {
         var updated = ReflectionInspector.listMembers(inst)
         updated = applyFilters(updated, ViewModelProvider(requireActivity())[MainViewModel::class.java])
         membersAdapter?.update(updated, inst)
+        // update collection info chip when instance may have changed (add/delete) after adapter refresh
+        updateCollectionChip(inst)
+    }
+
+    private fun updateCollectionChip(inst: Any) {
+        binding.collectionInfoChip.apply {
+            when (inst) {
+                is Collection<*> -> { text = getString(R.string.collection_size, inst.size); visibility = View.VISIBLE }
+                else -> {
+                    val cls = inst.javaClass
+                    when {
+                        cls.isArray -> { text = getString(R.string.array_size, ReflectionInspector.getArrayLength(inst)); visibility = View.VISIBLE }
+                        inst is Map<*, *> -> { text = getString(R.string.map_size, inst.size); visibility = View.VISIBLE }
+                        else -> visibility = View.GONE
+                    }
+                }
+            }
+        }
     }
 }
