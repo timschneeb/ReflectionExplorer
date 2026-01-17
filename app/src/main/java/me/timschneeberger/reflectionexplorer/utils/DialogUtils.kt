@@ -24,6 +24,7 @@ object Dialogs {
         Int::class.java, Integer.TYPE,
         Long::class.java, java.lang.Long.TYPE,
         java.lang.Boolean::class.java, java.lang.Boolean.TYPE,
+        java.lang.Float::class.java, java.lang.Float.TYPE,
         Double::class.java, java.lang.Double.TYPE -> true
         else -> false
     }
@@ -317,10 +318,11 @@ object Dialogs {
         fun parsePrimitive(): Any? {
             return when (type) {
                 String::class.java -> text
-                Int::class.java, Integer.TYPE -> text.toIntOrNull() ?: 0
-                Long::class.java, java.lang.Long.TYPE -> text.toLongOrNull() ?: 0L
+                Int::class.java, Integer.TYPE -> text.toInt()
+                Long::class.java, java.lang.Long.TYPE -> text.toLong()
                 Boolean::class.java, java.lang.Boolean.TYPE -> when (text.lowercase()) { "true" -> true; else -> false }
-                Double::class.java, java.lang.Double.TYPE -> text.toDoubleOrNull() ?: 0.0
+                Double::class.java, java.lang.Double.TYPE -> text.toDouble()
+                java.lang.Float::class.java, java.lang.Float.TYPE -> text.toFloat()
                 else -> null
             }
         }
