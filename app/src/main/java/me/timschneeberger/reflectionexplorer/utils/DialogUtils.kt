@@ -12,12 +12,12 @@ import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.android.material.checkbox.MaterialCheckBox
+import java.lang.reflect.Array
 import java.lang.reflect.Method
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 
 object Dialogs {
-    // DO NOT CHANGE: keep this as the original canParseType
     fun canParseType(type: Class<*>): Boolean = when (type) {
         java.lang.String::class.java,
         java.lang.Integer::class.java, java.lang.Integer.TYPE,
@@ -90,7 +90,7 @@ object Dialogs {
     ) {
         val field = fieldInfo.field
         showSimpleInputDialog(context, "Set ${field.name}", "New value for ${field.name} (${field.type.simpleName})", "") { text ->
-            runCatching { parseSimpleInput(text, field.type).also { ReflectionInspector.setField(instance, field, it) } }
+            runCatching { parseSimpleInput(text, field.type).also { instance.setField(field, it) } }
                 .onSuccess { callback(true, null) }
                 .onFailure { e -> anchor?.let { Snackbar.make(it, "Error: ${e.message}", Snackbar.LENGTH_SHORT).show() }; callback(false, e.message) }
         }
@@ -107,7 +107,7 @@ object Dialogs {
         val genericTypes = method.genericParameterTypes
 
         if (params.isEmpty()) {
-            runCatching { ReflectionInspector.invokeMethod(instance, method) }
+            runCatching { instance.invokeMethod(method) }
                 .onSuccess { r -> detailsText.text = "Invoked ${method.name} -> $r" }
                 .onFailure { e -> detailsText.text = "Error invoking: ${e.message}" }
             return
@@ -283,14 +283,14 @@ object Dialogs {
 
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
             runCatching {
-                val args = params.mapIndexed { i, t ->
+                params.mapIndexed { i, t ->
                     when (val view = inputViews[i]) {
                         is MaterialCheckBox -> view.isChecked as Any
                         is TextInputEditText -> parseValue(view.text.toString(), t, genericTypes.getOrNull(i), chosenElementClasses.getOrNull(i))
                         is MaterialAutoCompleteTextView -> if (t.isEnum) enumConstantFor(t, view.text.toString()) else null
                         else -> null
                     }
-                }.toTypedArray().let { ReflectionInspector.invokeMethod(instance, method, it) }
+                }.toTypedArray().let { instance.invokeMethod(method, it) }
             }.onSuccess { r -> detailsText.text = "Invoked ${method.name} -> $r"; dialog.dismiss() }
                 .onFailure { e -> detailsText.text = "Error invoking: ${e.message}" }
             dialog.dismiss()
@@ -328,8 +328,9 @@ object Dialogs {
             if (!content.startsWith("[") || !content.endsWith("]")) return null
             val inner = content.substring(1, content.length - 1)
             val parts = if (inner.isBlank()) emptyList() else inner.split(",").map { it.trim() }
-            val arr = ReflectionInspector.newArrayInstance(base, parts.size)
-            for (i in parts.indices) ReflectionInspector.setArrayElement(arr, i, parseValue(parts[i], base, null, null))
+            val arr = Array.newInstance(base, parts.size)
+            for (i in parts.indices)
+                Array.set(arr, i, parseValue(parts[i], base, null, null))
             return arr
         }
 

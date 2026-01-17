@@ -11,7 +11,6 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import me.timschneeberger.reflectionexplorer.MainActivity
-import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
 import me.timschneeberger.reflectionexplorer.model.InspectorViewModel
 import me.timschneeberger.reflectionexplorer.adapter.BreadcrumbAdapter
@@ -25,8 +24,9 @@ import me.timschneeberger.reflectionexplorer.utils.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.MapEntryInfo
 import me.timschneeberger.reflectionexplorer.utils.MethodInfo
 import me.timschneeberger.reflectionexplorer.utils.MemberInfo
-import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector
-import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector.formatPreview
+import me.timschneeberger.reflectionexplorer.utils.appendToArray
+import me.timschneeberger.reflectionexplorer.utils.formatObject
+import me.timschneeberger.reflectionexplorer.utils.listMembers
 import java.lang.reflect.Modifier
 
 private const val ARG_STACK_INDEX = "arg_stack_index"
@@ -84,7 +84,7 @@ class InspectorFragment : Fragment() {
         // collection info chip (moved after inst is known to avoid null assertions)
         updateCollectionChip(inst)
 
-        val membersRaw = ReflectionInspector.listMembers(inst)
+        val membersRaw = inst.listMembers()
         val members = applyFilters(membersRaw, mainVm)
 
         val vm = ViewModelProvider(requireActivity())[InspectorViewModel::class.java]
@@ -107,7 +107,7 @@ class InspectorFragment : Fragment() {
 
         // observe filter changes and update members list & button highlight immediately
         mainVm.memberFilterLive.observe(viewLifecycleOwner) { f ->
-            val updated = applyFilters(ReflectionInspector.listMembers(inst), mainVm)
+            val updated = applyFilters(inst.listMembers(), mainVm)
             membersAdapter?.update(updated, inst)
             binding.filterButton.isChecked = f.anyFiltersActive()
         }
@@ -134,8 +134,8 @@ class InspectorFragment : Fragment() {
             binding.addElementButton.visibility = View.VISIBLE
             binding.addElementButton.setOnClickListener {
                 // Show a simple dialog to enter a value and append it
-                val activityCompat = (activity as? AppCompatActivity) ?: return@setOnClickListener
-                Dialogs.showEditValueDialog(activityCompat, "Add element", "Value", "", collectionType, null, null, binding.root) { ok, parsed, _ ->
+                activity ?: return@setOnClickListener
+                Dialogs.showEditValueDialog(activity, "Add element", "Value", "", collectionType, null, null, binding.root) { ok, parsed, _ ->
                     if (!ok || parsed == null) return@showEditValueDialog
                     when {
                         // Prefer in-place mutation when the concrete list supports it.
@@ -177,12 +177,10 @@ class InspectorFragment : Fragment() {
                             activity.replaceStackAt(argIndex, newMap)
                         }
                         inst.javaClass.isArray -> {
-                            val comp = inst.javaClass.componentType ?: return@showEditValueDialog
-                            val len = ReflectionInspector.getArrayLength(inst)
-                            val newArr = ReflectionInspector.newArrayInstance(comp, len + 1)
-                            for (i in 0 until len) ReflectionInspector.setArrayElement(newArr, i, ReflectionInspector.getArrayElement(inst, i))
-                            ReflectionInspector.setArrayElement(newArr, len, parsed)
-                            activity.replaceStackAt(argIndex, newArr)
+                            activity.replaceStackAt(
+                                argIndex,
+                                appendToArray(inst, parsed)
+                            )
                         }
                         else -> {
                             // unsupported container
@@ -196,9 +194,7 @@ class InspectorFragment : Fragment() {
         viewLifecycleOwner.lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onResume(owner: LifecycleOwner) {
                 super.onResume(owner)
-                var updated = ReflectionInspector.listMembers(inst)
-                updated = applyFilters(updated, mainVm)
-                membersAdapter?.update(updated, inst)
+                refreshMembers()
             }
         })
 
@@ -289,17 +285,17 @@ class InspectorFragment : Fragment() {
 
     fun refreshMembers() {
         val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
-        val inst = mainVm.inspectionStack.getOrNull(argIndex) ?: return
-        var updated = ReflectionInspector.listMembers(inst)
-        updated = applyFilters(updated, ViewModelProvider(requireActivity())[MainViewModel::class.java])
-        membersAdapter?.update(updated, inst)
-        // update collection info chip when instance may have changed (add/delete) after adapter refresh
-        updateCollectionChip(inst)
+        val instance = mainVm.inspectionStack.getOrNull(argIndex) ?: return
+        applyFilters(instance.listMembers(), mainVm).let { items ->
+            membersAdapter?.update(items, instance)
+        }
+
+        updateCollectionChip(instance)
     }
 
     private fun updateCollectionChip(inst: Any) {
         binding.collectionInfoChip.apply {
-            text = formatPreview(requireContext(), inst)
+            text = formatObject(requireContext(), inst, additionalTypeInfo = null)
             visibility = if(inst is Collection<*> || inst.javaClass.isArray || inst is Map<*, *>) View.VISIBLE else View.GONE
         }
     }

@@ -20,7 +20,8 @@ import me.timschneeberger.reflectionexplorer.model.MainViewModel
 import me.timschneeberger.reflectionexplorer.utils.Dialogs
 import me.timschneeberger.reflectionexplorer.utils.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.MethodInfo
-import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector
+import me.timschneeberger.reflectionexplorer.utils.getField
+import me.timschneeberger.reflectionexplorer.utils.replaceReferences
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -106,7 +107,7 @@ class MainActivity : AppCompatActivity() {
     fun onInspectField(instance: Any, fieldInfo: FieldInfo, detailsText: TextView) {
         val field = fieldInfo.field
         try {
-            ReflectionInspector.getField(instance, field)?.let { openInspectorFor(it) } ?: run { detailsText.text = getString(R.string.member_value_null) }
+            instance.getField(field)?.let { openInspectorFor(it) } ?: run { detailsText.text = getString(R.string.member_value_null) }
         } catch (e: Exception) {
             detailsText.text = getString(R.string.error_prefix, e.message ?: "")
         }
@@ -135,7 +136,7 @@ class MainActivity : AppCompatActivity() {
         for (pIdx in 0 until idx) {
             val parent = vm.inspectionStack[pIdx]
             try {
-                val (changed, replacement) = ReflectionInspector.replaceReferences(parent, oldInstance, newInstance)
+                val (changed, replacement) = replaceReferences(parent, oldInstance, newInstance)
                 if (changed) replacedAny = true
                 if (replacement != null) {
                     // replacement is a new root for this parent position; recurse to replace in the stack
