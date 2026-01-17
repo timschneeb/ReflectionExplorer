@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -18,6 +19,7 @@ import me.timschneeberger.reflectionexplorer.adapter.BreadcrumbAdapter
 import me.timschneeberger.reflectionexplorer.adapter.MembersAdapter
 import me.timschneeberger.reflectionexplorer.databinding.FragmentInspectorBinding
 import me.timschneeberger.reflectionexplorer.utils.ClassHeaderInfo
+import me.timschneeberger.reflectionexplorer.utils.CollectionMember
 import me.timschneeberger.reflectionexplorer.utils.Dialogs
 import me.timschneeberger.reflectionexplorer.utils.ElementInfo
 import me.timschneeberger.reflectionexplorer.utils.FieldInfo
@@ -90,7 +92,7 @@ class InspectorFragment : Fragment() {
                 else -> {
                     val cls = inst.javaClass
                     when {
-                        cls.isArray -> { text = getString(R.string.array_size, java.lang.reflect.Array.getLength(inst)); visibility = View.VISIBLE }
+                        cls.isArray -> { text = getString(R.string.array_size, ReflectionInspector.getArrayLength(inst)); visibility = View.VISIBLE }
                         inst is Map<*, *> -> { text = getString(R.string.map_size, inst.size); visibility = View.VISIBLE }
                         else -> visibility = View.GONE
                     }
@@ -139,46 +141,44 @@ class InspectorFragment : Fragment() {
             setOnClickListener(null)
         }
 
-        // Determine element/value class heuristically so we can enable add/edit for simple types
-        var elementClass: Class<*>? = null
-        when (inst) {
-            is Collection<*> -> elementClass = inst.firstOrNull { it != null }?.javaClass
-            is Map<*, *> -> elementClass = inst.values.firstOrNull { it != null }?.javaClass
-            else -> if (inst.javaClass.isArray) elementClass = inst.javaClass.componentType
-        }
+        // Determine collection type for adding new elements; null if not a collection
+        val collectionType = membersRaw
+            .firstOrNull { it is CollectionMember && Dialogs.canParseType(it.getType(inst)) }
+            .let { (it as? CollectionMember)?.getType(inst) }
 
-        if (elementClass != null && Dialogs.canParseType(elementClass)) {
+        if (collectionType != null) {
             binding.addElementButton.visibility = View.VISIBLE
             binding.addElementButton.setOnClickListener {
                 // Show a simple dialog to enter a value and append it
-                val activityCompat = (activity as? androidx.appcompat.app.AppCompatActivity) ?: return@setOnClickListener
-                Dialogs.showEditValueDialog(activityCompat, "Add element", "Value", "", elementClass, null, null, binding.root) { ok, parsed, _ ->
+                val activityCompat = (activity as? AppCompatActivity) ?: return@setOnClickListener
+                Dialogs.showEditValueDialog(activityCompat, "Add element", "Value", "", collectionType, null, null, binding.root) { ok, parsed, _ ->
                     if (!ok || parsed == null) return@showEditValueDialog
                     when (inst) {
                         is MutableList<*> -> {
                             @Suppress("UNCHECKED_CAST")
                             (inst as MutableList<Any?>).add(parsed)
-                            (activity as? MainActivity)?.replaceStackAt(argIndex, inst)
+                            activity.replaceStackAt(argIndex, inst)
                         }
                         is Collection<*> -> {
-                            val newList = ArrayList(inst as Collection<Any?>)
+                            val newList = ArrayList(inst)
                             newList.add(parsed)
-                            (activity as? MainActivity)?.replaceStackAt(argIndex, newList)
+                            activity.replaceStackAt(argIndex, newList)
                         }
                         is Map<*, *> -> {
                             // for maps, create a new map and add generated key
+                            // TODO: allow custom key input; do not forget to handle key type parsing
                             val newMap = LinkedHashMap<String, Any?>((inst as Map<String, Any?>))
                             val newKey = "key${newMap.size}"
                             newMap[newKey] = parsed
-                            (activity as? MainActivity)?.replaceStackAt(argIndex, newMap)
+                            activity.replaceStackAt(argIndex, newMap)
                         }
                         else -> if (inst.javaClass.isArray) {
                             val comp = inst.javaClass.componentType ?: return@showEditValueDialog
-                            val len = java.lang.reflect.Array.getLength(inst)
-                            val newArr = java.lang.reflect.Array.newInstance(comp, len + 1)
-                            for (i in 0 until len) java.lang.reflect.Array.set(newArr, i, java.lang.reflect.Array.get(inst, i))
-                            java.lang.reflect.Array.set(newArr, len, parsed)
-                            (activity as? MainActivity)?.replaceStackAt(argIndex, newArr)
+                            val len = ReflectionInspector.getArrayLength(inst)
+                            val newArr = ReflectionInspector.newArrayInstance(comp, len + 1)
+                            for (i in 0 until len) ReflectionInspector.setArrayElement(newArr, i, ReflectionInspector.getArrayElement(inst, i))
+                            ReflectionInspector.setArrayElement(newArr, len, parsed)
+                            activity.replaceStackAt(argIndex, newArr)
                         }
                     }
                 }

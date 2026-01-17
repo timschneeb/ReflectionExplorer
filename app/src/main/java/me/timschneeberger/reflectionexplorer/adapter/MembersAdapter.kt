@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.snackbar.Snackbar
 import me.timschneeberger.reflectionexplorer.MainActivity
 import me.timschneeberger.reflectionexplorer.utils.ClassHeaderInfo
 import me.timschneeberger.reflectionexplorer.utils.ElementInfo
@@ -16,6 +17,7 @@ import me.timschneeberger.reflectionexplorer.utils.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.MapEntryInfo
 import me.timschneeberger.reflectionexplorer.utils.MemberInfo
 import me.timschneeberger.reflectionexplorer.utils.MethodInfo
+import me.timschneeberger.reflectionexplorer.utils.CollectionMember
 import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
@@ -25,7 +27,6 @@ import me.timschneeberger.reflectionexplorer.utils.dpToPx
 import me.timschneeberger.reflectionexplorer.utils.getFieldDrawable
 import me.timschneeberger.reflectionexplorer.utils.getMethodDrawable
 import java.lang.reflect.Array
-import java.util.LinkedHashMap
 
 private const val TYPE_HEADER = 0
 private const val TYPE_MEMBER = 1
@@ -48,18 +49,28 @@ class MembersAdapter(
 
     // Small helpers to reduce duplication
     private fun isList(): Boolean = rootInstance is List<*>
-    private fun isMutableList(): Boolean = rootInstance is MutableList<*>
     private fun asList(): List<Any?>? = rootInstance as? List<Any?>
 
     private fun isMap(): Boolean = rootInstance is Map<*, *>
-    @Suppress("UNCHECKED_CAST")
-    private fun asMap(): Map<Any?, Any?>? = rootInstance as? Map<Any?, Any?>
-    @Suppress("UNCHECKED_CAST")
-    private fun asMutableMap(): MutableMap<Any?, Any?>? = rootInstance as? MutableMap<Any?, Any?>
 
     private fun isArray(): Boolean = try { rootInstance.javaClass.isArray } catch (_: Exception) { false }
-    private fun arrayLength(): Int = try { if (isArray()) Array.getLength(rootInstance) else 0 } catch (_: Exception) { 0 }
-    private fun arrayGet(idx: Int): Any? = try { if (isArray()) { val len = Array.getLength(rootInstance); if (idx in 0 until len) Array.get(rootInstance, idx) else null } else null } catch (_: Exception) { null }
+    private fun arrayLength(): Int = try { if (isArray()) ReflectionInspector.getArrayLength(rootInstance) else 0 } catch (_: Exception) { 0 }
+
+    private fun boxPrimitive(c: Class<*>?): Class<*>? {
+        if (c == null) return null
+        if (!c.isPrimitive) return c
+        return when (c) {
+            java.lang.Integer.TYPE -> Integer::class.java
+            java.lang.Long.TYPE -> java.lang.Long::class.java
+            java.lang.Boolean.TYPE -> java.lang.Boolean::class.java
+            java.lang.Double.TYPE -> java.lang.Double::class.java
+            java.lang.Float.TYPE -> java.lang.Float::class.java
+            java.lang.Character.TYPE -> java.lang.Character::class.java
+            java.lang.Byte.TYPE -> java.lang.Byte::class.java
+            java.lang.Short.TYPE -> java.lang.Short::class.java
+            else -> c
+        }
+    }
 
     private fun replaceStack(activity: MainActivity, newValue: Any) {
         activity.replaceStackAt(stackIndex, newValue)
@@ -72,128 +83,40 @@ class MembersAdapter(
     }
 
     private fun performDelete(activity: MainActivity, item: MemberInfo) {
-        when (item) {
-            is ElementInfo -> deleteElementAt(activity, item.index)
-            is MapEntryInfo -> deleteMapEntry(activity, item.key)
-            else -> {
-                // No delete action for other MemberInfo types (e.g., Field/Method)
-            }
+        if (item is CollectionMember) {
+            val newRoot = item.applyDelete(rootInstance)
+            if (newRoot != null) activity.replaceStackAt(stackIndex, newRoot)
         }
     }
 
     private fun performEdit(activity: MainActivity, item: MemberInfo, anchor: View) {
         when (item) {
-            is FieldInfo -> {
-                activity.showSetFieldDialog(rootInstance, item) { ok, _ -> if (ok) replaceStack(activity, rootInstance) }
+            is FieldInfo -> activity.showSetFieldDialog(rootInstance, item) { ok, _ -> if (ok) replaceStack(activity, rootInstance) }
+            is CollectionMember -> {
+                val value = item.getValue(rootInstance)?.toString() ?: ""
+                val type = item.getType(rootInstance)
+
+                if (type == Any::class.java) {
+                    // cannot determine element type for editing
+                    Snackbar.make(anchor, "Cannot determine element type to edit", Snackbar.LENGTH_SHORT).show()
+                    return
+                }
+
+                Dialogs.showEditValueDialog(activity, activity.getString(R.string.action_set_value),
+                    activity.getString(R.string.action_set_value),
+                    value, type, null, null, anchor) { ok, parsed, _ ->
+                    if (!ok || parsed == null) return@showEditValueDialog
+                    val newRoot = item.applyEdit(rootInstance, parsed)
+                    if (newRoot != null) activity.replaceStackAt(stackIndex, newRoot)
+                }
             }
-            is ElementInfo -> editElementAt(activity, item.index, anchor)
-            is MapEntryInfo -> editMapEntry(activity, item.key, anchor)
             else -> {
                 // no-op for other types (e.g., Method invocation is handled elsewhere)
             }
         }
     }
 
-    private fun deleteElementAt(activity: MainActivity, index: Int) {
-        when {
-            isList() -> {
-                val copy = asList()?.toMutableList() ?: return
-                if (index in 0 until copy.size) {
-                    copy.removeAt(index)
-                    replaceStack(activity, copy)
-                }
-            }
-            isArray() -> {
-                val comp = try { rootInstance.javaClass.componentType } catch (_: Exception) { null } ?: return
-                val len = arrayLength()
-                if (index in 0 until len) {
-                    val newArr = Array.newInstance(comp, (len - 1).coerceAtLeast(0))
-                    var dst = 0
-                    for (i in 0 until len) {
-                        if (i == index) continue
-                        Array.set(newArr, dst++, Array.get(rootInstance, i))
-                    }
-                    replaceStack(activity, newArr)
-                }
-            }
-            else -> {
-                // not supported
-            }
-        }
-    }
-
-    private fun editElementAt(activity: MainActivity, index: Int, anchor: View) {
-        val currentValue: Any? = when {
-            isList() -> asList()?.getOrNull(index)
-            isArray() -> arrayGet(index)
-            else -> null
-        }
-        val elemClass = currentValue?.javaClass ?: return
-        val initial = currentValue.toString()
-        Dialogs.showEditValueDialog(activity, activity.getString(R.string.action_set_value), activity.getString(R.string.action_set_value), initial, elemClass, null, null, anchor) { ok, parsed, _ ->
-            if (!ok || parsed == null) return@showEditValueDialog
-            when {
-                isMutableList() -> {
-                    @Suppress("UNCHECKED_CAST")
-                    val lst = rootInstance as MutableList<Any?>
-                    if (index in 0 until lst.size) lst[index] = parsed
-                    replaceStack(activity, rootInstance)
-                }
-                isList() -> {
-                    val copy = asList()?.toMutableList() ?: return@showEditValueDialog
-                    if (index in 0 until copy.size) copy[index] = parsed
-                    replaceStack(activity, copy)
-                }
-                isArray() -> {
-                    val len = arrayLength()
-                    if (index in 0 until len) {
-                        try {
-                            Array.set(rootInstance, index, parsed)
-                            replaceStack(activity, rootInstance)
-                        } catch (_: Exception) {
-                            val comp = try { rootInstance.javaClass.componentType } catch (_: Exception) { null } ?: return@showEditValueDialog
-                            val newArr = Array.newInstance(comp, len)
-                            for (i in 0 until len) Array.set(newArr, i, Array.get(rootInstance, i))
-                            Array.set(newArr, index, parsed)
-                            replaceStack(activity, newArr)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun deleteMapEntry(activity: MainActivity, key: Any?) {
-        asMutableMap()?.let { m ->
-            m.remove(key)
-            replaceStack(activity, rootInstance)
-        } ?: run {
-            asMap()?.let { base ->
-                val copy = LinkedHashMap(base)
-                copy.remove(key)
-                replaceStack(activity, copy)
-            }
-        }
-    }
-
-    private fun editMapEntry(activity: MainActivity, key: Any?, anchor: View) {
-        val currentValue = asMap()?.get(key)
-        val valueClass = currentValue?.javaClass ?: return
-        val initial = currentValue.toString()
-        Dialogs.showEditValueDialog(activity, activity.getString(R.string.action_set_value), activity.getString(R.string.action_set_value), initial, valueClass, null, null, anchor) { ok, parsed, _ ->
-            if (!ok || parsed == null) return@showEditValueDialog
-            asMutableMap()?.let { m ->
-                m[key] = parsed
-                replaceStack(activity, rootInstance)
-            } ?: run {
-                asMap()?.let { base ->
-                    val copy = LinkedHashMap(base)
-                    copy[key] = parsed
-                    replaceStack(activity, copy)
-                }
-            }
-        }
-    }
+    // Element/map mutation helpers moved into ReflectionInspector; adapter calls those through performEdit/performDelete.
 
     class VH(val binding: ItemMemberBinding) : RecyclerView.ViewHolder(binding.root)
     class HeaderVH(val binding: ItemMemberHeaderBinding) : RecyclerView.ViewHolder(binding.root)
@@ -231,6 +154,7 @@ class MembersAdapter(
                 }
             }
 
+            // reset common state
             holder.binding.btnSet.isVisible = false
             holder.binding.btnDelete.isVisible = false
         }
@@ -244,10 +168,6 @@ class MembersAdapter(
      // Consolidated member binder: handles FieldInfo, MethodInfo, ElementInfo and MapEntryInfo
      private fun bindMember(hv: VH, item: MemberInfo) {
          hv.binding.apply {
-             // reset common state
-             btnSet.isVisible = false
-             btnDelete.isVisible = false
-
              when (item) {
                  is FieldInfo -> {
                      memberTitle.text = item.name
@@ -270,15 +190,12 @@ class MembersAdapter(
 
                  is ElementInfo -> {
                      memberTitle.text = item.name
-                     val currentValue: Any? = when {
-                         isList() -> asList()?.getOrNull(item.index)
-                         isArray() -> arrayGet(item.index)
-                         else -> null
-                     }
+                     val currentValue: Any? = (item as CollectionMember).getValue(rootInstance)
                      memberIcon.setImageResource(R.drawable.ic_class)
                      memberSubtitle.text = currentValue?.let { root.context.getString(R.string.member_value_format, it::class.java.simpleName, formatPreview(root.context, it)) } ?: root.context.getString(R.string.element_is_null)
 
-                     btnSet.isVisible = currentValue != null && Dialogs.canParseType(currentValue::class.java)
+                     // Determine whether this element is editable (allow editing arrays even when element is null by checking component type)
+                     btnSet.isVisible = Dialogs.canParseType(item.getType(rootInstance))
                      btnDelete.isVisible = when {
                          isList() -> item.index in 0 until (asList()?.size ?: 0)
                          isArray() -> item.index in 0 until arrayLength()
@@ -291,11 +208,12 @@ class MembersAdapter(
 
                  is MapEntryInfo -> {
                      memberTitle.text = item.key?.toString() ?: ""
-                     memberSubtitle.text = item.value?.let { root.context.getString(R.string.member_value_format, it::class.java.simpleName, formatPreview(root.context, it)) } ?: root.context.getString(R.string.member_value_null)
+                     val currentValue = (item as CollectionMember).getValue(rootInstance)
+                     memberSubtitle.text = currentValue?.let { root.context.getString(R.string.member_value_format, it::class.java.simpleName, formatPreview(root.context, it)) } ?: root.context.getString(R.string.member_value_null)
                      memberIcon.setImageResource(R.drawable.ic_field)
 
                      val canDelete = isMap()
-                     val canEdit = item.value != null && Dialogs.canParseType(item.value::class.java)
+                     val canEdit = currentValue != null && Dialogs.canParseType(currentValue::class.java)
                      btnDelete.isVisible = canDelete
                      btnSet.isVisible = canEdit
 
@@ -345,8 +263,8 @@ class MembersAdapter(
                 rebuildVisible()
                 notifyDataSetChanged()
             }
-        }
-    }
+         }
+     }
 
     @SuppressLint("NotifyDataSetChanged")
     fun update(newItems: List<MemberInfo>, newRootInstance: Any? = null) {

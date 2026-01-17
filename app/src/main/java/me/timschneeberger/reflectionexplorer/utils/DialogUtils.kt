@@ -5,35 +5,25 @@ import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.android.material.checkbox.MaterialCheckBox
-import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector
-import me.timschneeberger.reflectionexplorer.utils.FieldInfo
-import me.timschneeberger.reflectionexplorer.utils.dpToPx
 import java.lang.reflect.Method
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 
 object Dialogs {
     fun canParseType(type: Class<*>): Boolean = when (type) {
-        String::class.java,
-        Int::class.java, Integer.TYPE,
-        Long::class.java, java.lang.Long.TYPE,
+        java.lang.String::class.java,
+        java.lang.Integer::class.java, java.lang.Integer.TYPE,
+        java.lang.Long::class.java, java.lang.Long.TYPE,
         java.lang.Boolean::class.java, java.lang.Boolean.TYPE,
         java.lang.Float::class.java, java.lang.Float.TYPE,
-        Double::class.java, java.lang.Double.TYPE -> true
+        java.lang.Double::class.java, java.lang.Double.TYPE -> true
         else -> false
-    }
-
-    // Public helper: parse a simple textual value into the requested type.
-    // Returns null if it cannot be parsed (or intentionally returns null for unsupported types).
-    fun parseValuePublic(text: String, type: Class<*>, genericType: Type? = null, elementClass: Class<*>? = null): Any? {
-        return try { parseValue(text, type, genericType, elementClass) } catch (e: Exception) { null }
     }
 
     /**
@@ -343,12 +333,12 @@ object Dialogs {
 
     private fun parseSimpleInput(text: String, type: Class<*>): Any {
         return when (type) {
-            String::class.java -> text
-            Int::class.java, Integer.TYPE -> text.toInt()
-            Long::class.java, java.lang.Long.TYPE -> text.toLong()
+            java.lang.String::class.java -> text
+            java.lang.Integer::class.java, Integer.TYPE -> text.toInt()
+            java.lang.Long::class.java, java.lang.Long.TYPE -> text.toLong()
             java.lang.Boolean::class.java, java.lang.Boolean.TYPE -> when (text.lowercase()) { "true" -> true; else -> false }
-            Double::class.java, java.lang.Double.TYPE -> text.toDouble()
-            Float::class.java, java.lang.Float.TYPE -> text.toFloat()
+            java.lang.Double::class.java, java.lang.Double.TYPE -> text.toDouble()
+            java.lang.Float::class.java, java.lang.Float.TYPE -> text.toFloat()
             else -> throw IllegalArgumentException("Unsupported field type: ${type.simpleName}")
         }
     }
@@ -357,12 +347,12 @@ object Dialogs {
         // Helper: try primitive/boxed types first
         fun parsePrimitive(): Any? {
             return when (type) {
-                String::class.java -> text
-                Int::class.java, Integer.TYPE -> text.toInt()
-                Long::class.java, java.lang.Long.TYPE -> text.toLong()
-                Boolean::class.java, java.lang.Boolean.TYPE -> when (text.lowercase()) { "true" -> true; else -> false }
-                Double::class.java, java.lang.Double.TYPE -> text.toDouble()
-                Float::class.java, java.lang.Float.TYPE -> text.toFloat()
+                java.lang.String::class.java -> text
+                java.lang.Integer::class.java, Integer.TYPE -> text.toInt()
+                java.lang.Long::class.java, java.lang.Long.TYPE -> text.toLong()
+                java.lang.Boolean::class.java, java.lang.Boolean.TYPE -> when (text.lowercase()) { "true" -> true; else -> false }
+                java.lang.Double::class.java, java.lang.Double.TYPE -> text.toDouble()
+                java.lang.Float::class.java, java.lang.Float.TYPE -> text.toFloat()
                 else -> null
             }
         }
@@ -373,9 +363,9 @@ object Dialogs {
             if (!content.startsWith("[") || !content.endsWith("]")) return null
             val inner = content.substring(1, content.length - 1)
             val parts = if (inner.isBlank()) emptyList() else inner.split(",").map { it.trim() }
-            val arr = java.lang.reflect.Array.newInstance(base, parts.size)
+            val arr = ReflectionInspector.newArrayInstance(base, parts.size)
             for (i in parts.indices) {
-                java.lang.reflect.Array.set(arr, i, parseValue(parts[i], base, null, null))
+                ReflectionInspector.setArrayElement(arr, i, parseValue(parts[i], base, null, null))
             }
             return arr
         }
