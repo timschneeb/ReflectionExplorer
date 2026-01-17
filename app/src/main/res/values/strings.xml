@@ -12,4 +12,9 @@
     <string name="member_value_null">Member value is null</string>
     <string name="element_is_null">Element is null</string>
     <string name="error_prefix">Error: %1$s</string>
+    <!-- Extracted/templated strings -->
+    <string name="member_signature" translatable="false">%1$s(%2$s)</string>
+    <string name="method_return">-> %1$s</string>
+    <string name="header_title">%1$s (%2$d)</string>
+    <string name="member_value_format">%1$s -> %2$s</string>
 </resources>

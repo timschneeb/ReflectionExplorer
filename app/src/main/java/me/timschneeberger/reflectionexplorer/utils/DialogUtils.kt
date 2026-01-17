@@ -1,5 +1,6 @@
 package me.timschneeberger.reflectionexplorer.utils
 
+import android.content.Context
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
@@ -40,7 +41,7 @@ object Dialogs {
      * callback: (success, parsedValue?, errorMessage?)
      */
     fun showEditValueDialog(
-        activity: AppCompatActivity?,
+        context: Context,
         title: String,
         hint: String,
         initialText: String,
@@ -50,15 +51,13 @@ object Dialogs {
         anchor: View?,
         callback: (Boolean, Any?, String?) -> Unit
     ) {
-        if (activity == null) { callback(false, null, "No activity"); return }
-        val ctx = activity
-        val til = TextInputLayout(ctx)
-        val input = TextInputEditText(ctx)
+        val til = TextInputLayout(context)
+        val input = TextInputEditText(context)
         input.hint = hint
         input.setText(initialText)
         til.addView(input)
 
-        val dialog = MaterialAlertDialogBuilder(ctx)
+        val dialog = MaterialAlertDialogBuilder(context)
             .setTitle(title)
             .setView(til)
             .setPositiveButton("OK", null)
@@ -80,24 +79,19 @@ object Dialogs {
     }
 
     fun showSetFieldDialog(
-        activity: AppCompatActivity?,
+        context: Context,
         instance: Any,
         fieldInfo: FieldInfo,
         anchor: View?,
         callback: (Boolean, String?) -> Unit
     ) {
-        if (activity == null) {
-            callback(false, "No activity")
-            return
-        }
         val field = fieldInfo.field
-        val ctx = activity
-        val til = TextInputLayout(ctx)
-        val input = TextInputEditText(ctx)
+        val til = TextInputLayout(context)
+        val input = TextInputEditText(context)
         input.hint = "New value for ${field.name} (${field.type.simpleName})"
         til.addView(input)
 
-        val dialog = MaterialAlertDialogBuilder(ctx)
+        val dialog = MaterialAlertDialogBuilder(context)
             .setTitle("Set ${field.name}")
             .setView(til)
             .setPositiveButton("Set", null)
@@ -121,19 +115,14 @@ object Dialogs {
     }
 
     fun showMethodInvocationDialog(
-        activity: AppCompatActivity?,
+        context: Context,
         instance: Any,
         method: Method,
         detailsText: TextView,
         anchor: View?
     ) {
-        if (activity == null) {
-            detailsText.text = "No activity"
-            return
-        }
         val params = method.parameterTypes
         val genericTypes = method.genericParameterTypes
-        val ctx = activity
         if (params.isEmpty()) {
             try {
                 val r = ReflectionInspector.invokeMethod(instance, method)
@@ -144,10 +133,10 @@ object Dialogs {
             return
         }
 
-        val layout = LinearLayout(ctx).apply { orientation = LinearLayout.VERTICAL }
+        val layout = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
         val inputViews = mutableListOf<View>()
         val chosenElementClasses = MutableList<Class<*>?>(params.size) { null }
-        val preview = TextView(ctx).apply { text = "Preview: []" }
+        val preview = TextView(context).apply { text = "Preview: []" }
 
         fun updatePreview() {
             val parsed = params.mapIndexed { i, pClasspath ->
@@ -174,14 +163,14 @@ object Dialogs {
 
         for (i in params.indices) {
             val pClass = params[i]
-            val label = TextView(ctx).apply { text = "param${i}: ${pClass.simpleName}" }
+            val label = TextView(context).apply { text = "param${i}: ${pClass.simpleName}" }
             layout.addView(label)
 
             if (pClass.isEnum) {
                 val enums = pClass.enumConstants?.map { (it as Enum<*>).name } ?: emptyList()
-                val til = TextInputLayout(ctx)
-                val auto = MaterialAutoCompleteTextView(ctx)
-                auto.setAdapter(ArrayAdapter(ctx, android.R.layout.simple_list_item_1, enums))
+                val til = TextInputLayout(context)
+                val auto = MaterialAutoCompleteTextView(context)
+                auto.setAdapter(ArrayAdapter(context, android.R.layout.simple_list_item_1, enums))
                 auto.setOnItemClickListener { _, _, _, _ -> updatePreview() }
                 til.addView(auto)
                 inputViews.add(auto)
@@ -208,16 +197,16 @@ object Dialogs {
             }
 
             if (needsElementSelector) {
-                val til = TextInputLayout(ctx)
-                val auto = MaterialAutoCompleteTextView(ctx)
-                auto.setAdapter(ArrayAdapter(ctx, android.R.layout.simple_list_item_1, typeOptions))
+                val til = TextInputLayout(context)
+                val auto = MaterialAutoCompleteTextView(context)
+                auto.setAdapter(ArrayAdapter(context, android.R.layout.simple_list_item_1, typeOptions))
                 auto.setOnItemClickListener { _, _, position, _ ->
                     val choice = typeOptions[position]
                     if (choice == "Custom...") {
-                        val inputClass = TextInputEditText(ctx).apply {
+                        val inputClass = TextInputEditText(context).apply {
                             setPadding(24.dpToPx(), 12.dpToPx(), 24.dpToPx(), 0)
                         }
-                        MaterialAlertDialogBuilder(ctx)
+                        MaterialAlertDialogBuilder(context)
                             .setTitle("Enter element class (e.g. java.lang.Integer)")
                             .setView(inputClass)
                             .setPositiveButton("OK") { _, _ ->
@@ -244,15 +233,15 @@ object Dialogs {
 
             when (pClass) {
                 Boolean::class.java, java.lang.Boolean.TYPE -> {
-                    val cb = MaterialCheckBox(ctx)
+                    val cb = MaterialCheckBox(context)
                     cb.isChecked = false
                     cb.setOnCheckedChangeListener { _, _ -> updatePreview() }
                     inputViews.add(cb)
                     layout.addView(cb)
                 }
                 Int::class.java, Integer.TYPE, Long::class.java, java.lang.Long.TYPE, Double::class.java, java.lang.Double.TYPE -> {
-                    val til = TextInputLayout(ctx)
-                    val numInput = TextInputEditText(ctx)
+                    val til = TextInputLayout(context)
+                    val numInput = TextInputEditText(context)
                     numInput.inputType = when (pClass) {
                         Int::class.java, Integer.TYPE -> android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
                         Long::class.java, java.lang.Long.TYPE -> android.text.InputType.TYPE_CLASS_NUMBER
@@ -273,8 +262,8 @@ object Dialogs {
                     layout.addView(til)
                 }
                 else -> {
-                    val til = TextInputLayout(ctx)
-                    val txt = TextInputEditText(ctx)
+                    val til = TextInputLayout(context)
+                    val txt = TextInputEditText(context)
                     txt.inputType = android.text.InputType.TYPE_CLASS_TEXT
                     txt.hint = if (pClass.isArray || java.util.Collection::class.java.isAssignableFrom(pClass) || java.util.Map::class.java.isAssignableFrom(pClass)) "Use [a,b] or {k:v}" else ""
                     txt.addTextChangedListener(object : android.text.TextWatcher {
@@ -315,7 +304,7 @@ object Dialogs {
             updatePreview()
         }
 
-        val builder = MaterialAlertDialogBuilder(ctx)
+        val builder = MaterialAlertDialogBuilder(context)
             .setTitle("Invoke ${method.name}")
             .setView(layout)
             .setPositiveButton("Invoke") { dialog, _ ->
