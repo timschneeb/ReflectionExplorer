@@ -211,7 +211,6 @@ object ReflectionInspector {
     internal fun editMapInternal(rootInstance: Any, key: Any?, newValue: Any?): Any? {
         return when (rootInstance) {
             is MutableMap<*, *> -> {
-                @Suppress("UNCHECKED_CAST")
                 val m = rootInstance as MutableMap<Any?, Any?>
                 if (m.containsKey(key)) {
                     m[key] = newValue
@@ -219,7 +218,6 @@ object ReflectionInspector {
                 } else null
             }
             is Map<*, *> -> {
-                @Suppress("UNCHECKED_CAST")
                 val copy = LinkedHashMap(rootInstance as Map<Any?, Any?>)
                 if (copy.containsKey(key)) {
                     copy[key] = newValue
