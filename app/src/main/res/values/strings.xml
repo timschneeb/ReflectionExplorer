@@ -6,4 +6,8 @@
     <string name="action_reevaluate">Re-evaluate field</string>
     <string name="action_set_value">Set field value</string>
     <string name="action_refresh">Refresh</string>
+    <string name="cannot_inspect_simple">Cannot inspect primitive or simple types</string>
+    <string name="member_value_null">Member value is null</string>
+    <string name="element_is_null">Element is null</string>
+    <string name="error_prefix">Error: %1$s</string>
 </resources>

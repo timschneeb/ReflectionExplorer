@@ -19,6 +19,7 @@ import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.utils.ReflectionInspector
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberHeaderBinding
+import me.timschneeberger.reflectionexplorer.utils.Dialogs
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
 import me.timschneeberger.reflectionexplorer.utils.getFieldDrawable
 import me.timschneeberger.reflectionexplorer.utils.getMethodDrawable
@@ -134,7 +135,7 @@ class MembersAdapter(
             } catch (_: Exception) { "<error>" }
             memberIcon.setImageDrawable(item.field.getFieldDrawable(root.context))
 
-            btnSet.isVisible = MainActivity.canParseType(item.field.type)
+            btnSet.isVisible = Dialogs.canParseType(item.field.type)
             btnSet.setOnClickListener {
                 val ctx = root.context
                 (ctx as? MainActivity)?.let { act ->
