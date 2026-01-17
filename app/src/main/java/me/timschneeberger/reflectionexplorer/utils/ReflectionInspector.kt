@@ -74,27 +74,27 @@ class MapEntryInfo(name: String, val key: Any?, val value: Any?) : MemberInfo(na
 // Header that groups members declared on a particular class
 class ClassHeaderInfo(val cls: Class<*>) : MemberInfo(cls.simpleName)
 
-fun formatObject(ctx: Context, v: Any?, additionalTypeInfo: GettableMember?, withType: Boolean = true): String = try {
-    var type = v?.javaClass?.simpleName ?: additionalTypeInfo?.getType(v ?: Any())?.simpleName ?: "Unknown"
-    val value = when (v) {
+fun Any?.formatObject(ctx: Context, additionalTypeInfo: GettableMember?, withType: Boolean = true): String = try {
+    var type = this?.javaClass?.simpleName ?: additionalTypeInfo?.getType(this ?: Any())?.simpleName ?: "Unknown"
+    val value = when (this) {
         null -> "null"
-        is CharSequence -> v.toString().let { s -> if (s.length > 80) "\"${s.take(80)}...\" (len=${s.length})" else "\"$s\"" }
+        is CharSequence -> this.toString().let { s -> if (s.length > 80) "\"${s.take(80)}...\" (len=${s.length})" else "\"$s\"" }
         is Collection<*> -> run {
-            val elemName = v.firstOrNull { it != null }?.javaClass?.simpleName ?: "Any"
+            val elemName = this.firstOrNull { it != null }?.javaClass?.simpleName ?: "Any"
             type = "$type<$elemName>"
-            ctx.getString(R.string.collection_size, v.size)
+            ctx.getString(R.string.collection_size, this.size)
         }
         is Map<*, *> -> run {
-            val keyName = v.keys.firstOrNull { it != null }?.javaClass?.simpleName ?: "Any"
-            val valName = v.values.firstOrNull { it != null }?.javaClass?.simpleName ?: "Any"
+            val keyName = this.keys.firstOrNull { it != null }?.javaClass?.simpleName ?: "Any"
+            val valName = this.values.firstOrNull { it != null }?.javaClass?.simpleName ?: "Any"
             type = "$type<$keyName, $valName>"
-            ctx.getString(R.string.collection_size, v.size)
+            ctx.getString(R.string.collection_size, this.size)
         }
         else -> {
-            if (v.javaClass.isArray) {
-                ctx.getString(R.string.collection_size, JArray.getLength(v))
+            if (this.javaClass.isArray) {
+                ctx.getString(R.string.collection_size, JArray.getLength(this))
             } else {
-                v.toString().let { s -> if (s.length > 120) "${s.take(120)}... (len=${s.length})" else s }
+                this.toString().let { s -> if (s.length > 120) "${s.take(120)}... (len=${s.length})" else s }
             }
         }
     }
@@ -102,6 +102,97 @@ fun formatObject(ctx: Context, v: Any?, additionalTypeInfo: GettableMember?, wit
 } catch (e: Exception) {
     e.printStackTrace()
     "<error>"
+}
+
+// Reflection helper to set a field value, attempting to clear the final modifier if necessary
+fun Any.setField(field: Field, value: Any?) {
+    try {
+        field.isAccessible = true
+        val modsField = Field::class.java.getDeclaredField("modifiers")
+        modsField.isAccessible = true
+        val origMods = modsField.getInt(field)
+        // clear final bit if present
+        if ((origMods and java.lang.reflect.Modifier.FINAL) != 0) {
+            modsField.setInt(field, origMods and java.lang.reflect.Modifier.FINAL.inv())
+            try { field.set(this, value) } catch (_: Exception) {}
+            // restore
+            modsField.setInt(field, origMods)
+        } else {
+            field.set(this, value)
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        try { field.set(this, value) } catch (e2: Exception) {
+            e2.printStackTrace()
+        }
+    }
+}
+
+fun Any.getField(field: Field): Any? {
+    field.isAccessible = true
+    return field.get(this)
+}
+
+fun Any?.invokeMethod(method: Method, args: Array<Any?> = emptyArray()): Any? {
+    method.isAccessible = true
+    return method.invoke(this, *args)
+}
+
+fun Any.listMembers(): List<MemberInfo> {
+    val cls = this::class.java
+    val members = mutableListOf<MemberInfo>()
+
+    // If the instance itself is a Collection/Array/Map, expose elements as entries first
+    if (this is Collection<*>) {
+        members.addAll(this.mapIndexed { idx, v -> ElementInfo("[$idx]", idx, v) })
+    } else if (cls.isArray) {
+        val len = JArray.getLength(this)
+        for (i in 0 until len) {
+            val v = JArray.get(this, i)
+            members.add(ElementInfo("[$i]", i, v))
+        }
+    } else if (this is Map<*, *>) {
+        this.entries.forEach { e ->
+            members.add(MapEntryInfo("{${e.key}}", e.key, e.value))
+        }
+    }
+
+    // Group declared fields/methods by their declaring class along the superclass chain
+    var current: Class<*>? = cls
+    while (current != null) {
+        // collect declared members for this declaring class
+        val declaredFields = current.declaredFields.map { f -> f.apply { isAccessible = true }; FieldInfo(f.name, f) }
+        val declaredMethods = current.declaredMethods.map { m -> m.apply { isAccessible = true }; MethodInfo(m.name, m) }
+        if (declaredFields.isNotEmpty() || declaredMethods.isNotEmpty()) {
+            members.add(ClassHeaderInfo(current))
+            // add fields then methods (sorted by name)
+            val combined = (declaredFields + declaredMethods).sortedBy { it.name }
+            members.addAll(combined)
+        }
+        current = current.superclass
+        if (current == Any::class.java) {
+            // include java.lang.Object members optionally? skip to avoid noise
+            break
+        }
+    }
+
+    return members
+}
+
+/**
+ * Create a new array with one additional slot and append [element] at the end.
+ * Returns the new array instance or null on failure.
+ */
+fun appendToArray(array: Any, element: Any?): Any {
+    val cls = array::class.java
+    if (!cls.isArray)
+        throw IllegalArgumentException("Not an array: ${cls.name}")
+    val len = JArray.getLength(array)
+    val newArr = JArray.newInstance(cls.componentType!!, len + 1)
+    for (i in 0 until len)
+        JArray.set(newArr, i, JArray.get(array, i))
+    JArray.set(newArr, len, element)
+    return newArr
 }
 
 // Internal helpers to consolidate mutation logic for elements and maps
@@ -249,95 +340,4 @@ private fun editMapInternal(rootInstance: Any, key: Any?, newValue: Any?): Any? 
         }
         else -> null
     }
-}
-
-// Reflection helper to set a field value, attempting to clear the final modifier if necessary
-fun Any.setField(field: Field, value: Any?) {
-    try {
-        field.isAccessible = true
-        val modsField = Field::class.java.getDeclaredField("modifiers")
-        modsField.isAccessible = true
-        val origMods = modsField.getInt(field)
-        // clear final bit if present
-        if ((origMods and java.lang.reflect.Modifier.FINAL) != 0) {
-            modsField.setInt(field, origMods and java.lang.reflect.Modifier.FINAL.inv())
-            try { field.set(this, value) } catch (_: Exception) {}
-            // restore
-            modsField.setInt(field, origMods)
-        } else {
-            field.set(this, value)
-        }
-    } catch (e: Exception) {
-        e.printStackTrace()
-        try { field.set(this, value) } catch (e2: Exception) {
-            e2.printStackTrace()
-        }
-    }
-}
-
-fun Any.getField(field: Field): Any? {
-    field.isAccessible = true
-    return field.get(this)
-}
-
-fun Any?.invokeMethod(method: Method, args: Array<Any?> = emptyArray()): Any? {
-    method.isAccessible = true
-    return method.invoke(this, *args)
-}
-
-/**
- * Create a new array with one additional slot and append [element] at the end.
- * Returns the new array instance or null on failure.
- */
-fun appendToArray(array: Any, element: Any?): Any {
-    val cls = array::class.java
-    if (!cls.isArray)
-        throw IllegalArgumentException("Not an array: ${cls.name}")
-    val len = JArray.getLength(array)
-    val newArr = JArray.newInstance(cls.componentType!!, len + 1)
-    for (i in 0 until len)
-        JArray.set(newArr, i, JArray.get(array, i))
-    JArray.set(newArr, len, element)
-    return newArr
-}
-
-fun Any.listMembers(): List<MemberInfo> {
-    val cls = this::class.java
-    val members = mutableListOf<MemberInfo>()
-
-    // If the instance itself is a Collection/Array/Map, expose elements as entries first
-    if (this is Collection<*>) {
-        members.addAll(this.mapIndexed { idx, v -> ElementInfo("[$idx]", idx, v) })
-    } else if (cls.isArray) {
-        val len = JArray.getLength(this)
-        for (i in 0 until len) {
-            val v = JArray.get(this, i)
-            members.add(ElementInfo("[$i]", i, v))
-        }
-    } else if (this is Map<*, *>) {
-        this.entries.forEach { e ->
-            members.add(MapEntryInfo("{${e.key}}", e.key, e.value))
-        }
-    }
-
-    // Group declared fields/methods by their declaring class along the superclass chain
-    var current: Class<*>? = cls
-    while (current != null) {
-        // collect declared members for this declaring class
-        val declaredFields = current.declaredFields.map { f -> f.apply { isAccessible = true }; FieldInfo(f.name, f) }
-        val declaredMethods = current.declaredMethods.map { m -> m.apply { isAccessible = true }; MethodInfo(m.name, m) }
-        if (declaredFields.isNotEmpty() || declaredMethods.isNotEmpty()) {
-            members.add(ClassHeaderInfo(current))
-            // add fields then methods (sorted by name)
-            val combined = (declaredFields + declaredMethods).sortedBy { it.name }
-            members.addAll(combined)
-        }
-        current = current.superclass
-        if (current == Any::class.java) {
-            // include java.lang.Object members optionally? skip to avoid noise
-            break
-        }
-    }
-
-    return members
 }

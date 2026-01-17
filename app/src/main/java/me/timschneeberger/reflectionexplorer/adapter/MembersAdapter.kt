@@ -84,13 +84,16 @@ class MembersAdapter(
                 is FieldInfo -> {
                     memberTitle.text = item.name
                     memberSubtitle.text = try {
-                        val v = rootInstance.getField(item.field)
-                        if (v == null) root.context.getString(R.string.member_value_null) else formatObject(root.context, v, item)
-                    } catch (e: Exception) { root.context.getString(R.string.error_prefix, e) }
+                        rootInstance.getField(item.field)?.formatObject(root.context, item)
+                    } catch (e: Exception) {
+                        root.context.getString(R.string.error_prefix, e)
+                    }
                     memberIcon.setImageDrawable(item.field.getFieldDrawable(root.context))
 
                     btnSet.isVisible = Dialogs.canParseType(item.field.type)
-                    btnSet.setOnClickListener { runWithActivity(root) { act -> act.showSetFieldDialog(rootInstance, item) { ok, _ -> if (ok) act.replaceStackAt(stackIndex, rootInstance) } } }
+                    btnSet.setOnClickListener { runWithActivity(root) { act -> act.showSetFieldDialog(rootInstance, item) {
+                        ok, _ -> if (ok) act.replaceStackAt(stackIndex, rootInstance)
+                    } } }
                 }
 
                 is MethodInfo -> {
@@ -105,7 +108,7 @@ class MembersAdapter(
 
                     memberTitle.text = item.name
                     memberIcon.setImageResource(R.drawable.ic_class)
-                    memberSubtitle.text = formatObject(root.context, currentValue, item)
+                    memberSubtitle.text = currentValue.formatObject(root.context, item)
 
                     // Determine whether this element is editable
                     btnSet.isVisible = Dialogs.canParseType(item.getType(rootInstance))
@@ -119,7 +122,7 @@ class MembersAdapter(
                     val currentValue = (item as CollectionMember).getValue(rootInstance)
 
                     memberTitle.text = item.key?.toString() ?: "null"
-                    memberSubtitle.text = formatObject(root.context, currentValue, item)
+                    memberSubtitle.text = currentValue.formatObject(root.context, item)
                     memberIcon.setImageResource(R.drawable.ic_field)
 
                     btnDelete.isVisible = rootInstance is Map<*, *>

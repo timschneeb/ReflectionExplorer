@@ -29,8 +29,6 @@ import me.timschneeberger.reflectionexplorer.utils.formatObject
 import me.timschneeberger.reflectionexplorer.utils.listMembers
 import java.lang.reflect.Modifier
 
-private const val ARG_STACK_INDEX = "arg_stack_index"
-
 class InspectorFragment : Fragment() {
     private var argIndex: Int = -1
     private var bcAdapter: BreadcrumbAdapter? = null
@@ -38,12 +36,6 @@ class InspectorFragment : Fragment() {
 
     // make adapter a property so we can update it from observers
     private var membersAdapter: MembersAdapter? = null
-
-    companion object {
-        fun newInstance(stackIndex: Int): InspectorFragment = InspectorFragment().apply {
-            arguments = Bundle().apply { putInt(ARG_STACK_INDEX, stackIndex) }
-        }
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -295,8 +287,16 @@ class InspectorFragment : Fragment() {
 
     private fun updateCollectionChip(inst: Any) {
         binding.collectionInfoChip.apply {
-            text = formatObject(requireContext(), inst, additionalTypeInfo = null)
+            text = inst.formatObject(requireContext(), additionalTypeInfo = null)
             visibility = if(inst is Collection<*> || inst.javaClass.isArray || inst is Map<*, *>) View.VISIBLE else View.GONE
+        }
+    }
+
+    companion object {
+        private const val ARG_STACK_INDEX = "arg_stack_index"
+
+        fun newInstance(stackIndex: Int): InspectorFragment = InspectorFragment().apply {
+            arguments = Bundle().apply { putInt(ARG_STACK_INDEX, stackIndex) }
         }
     }
 }

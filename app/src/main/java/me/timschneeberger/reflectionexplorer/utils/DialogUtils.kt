@@ -28,12 +28,6 @@ object Dialogs {
         else -> false
     }
 
-    // Helpers to build input views
-    private fun createTextInputLayout(context: Context, hint: String = "", initial: String = ""): TextInputLayout =
-        TextInputLayout(context).apply {
-            addView(TextInputEditText(context).apply { this.hint = hint; setText(initial) })
-        }
-
     private fun showSimpleInputDialog(
         context: Context,
         title: String,
@@ -41,7 +35,9 @@ object Dialogs {
         initialText: String,
         onOk: (String) -> Unit
     ) {
-        val til = createTextInputLayout(context, hint, initialText)
+        val til = TextInputLayout(context).apply {
+            addView(TextInputEditText(context).apply { this.hint = hint; setText(initialText) })
+        }
 
         MaterialAlertDialogBuilder(context)
             .setTitle(title)

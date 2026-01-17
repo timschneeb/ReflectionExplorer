@@ -9,7 +9,7 @@ import me.timschneeberger.reflectionexplorer.databinding.ItemInstanceBinding
 class InstancesAdapter(
     private val items: List<Any>,
     private val onClick: (Any) -> Unit
-) : RecyclerView.Adapter<InstancesAdapter.VH>() {
+) : ExpandableListAdapter<Any>(items, mutableSetOf()) {
 
     class VH(val binding: ItemInstanceBinding) : RecyclerView.ViewHolder(binding.root)
 
@@ -17,12 +17,23 @@ class InstancesAdapter(
         return VH(ItemInstanceBinding.inflate(LayoutInflater.from(parent.context), parent, false))
     }
 
-    override fun onBindViewHolder(holder: VH, position: Int) {
-        val item = items[position]
-        holder.binding.itemTitle.text = item::class.java.simpleName
-        holder.binding.itemSubtitle.text = item.toString()
-        holder.binding.itemIcon.setImageResource(R.drawable.ic_class)
-        holder.binding.root.setOnClickListener { onClick(item) }
+    override fun isHeader(item: Any): Boolean = false
+    override fun headerKey(item: Any): String = ""
+
+    override fun bindHeaderVH(holder: RecyclerView.ViewHolder, item: Any) {}
+
+    override fun bindItemVH(
+        holder: RecyclerView.ViewHolder,
+        item: Any
+    ) {
+        (holder as VH).binding.apply {
+            applyRoundedBackground(instanceContainer, visibleItems.indexOf(item))
+
+            itemTitle.text = item::class.java.simpleName
+            itemSubtitle.text = item.toString()
+            itemIcon.setImageResource(R.drawable.ic_class)
+            root.setOnClickListener { onClick(item) }
+        }
     }
 
     override fun getItemCount(): Int = items.size
