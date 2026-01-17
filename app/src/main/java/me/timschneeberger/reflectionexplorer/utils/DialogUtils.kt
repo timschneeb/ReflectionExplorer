@@ -309,6 +309,7 @@ object Dialogs {
             Long::class.java, java.lang.Long.TYPE -> text.toLong()
             java.lang.Boolean::class.java, java.lang.Boolean.TYPE -> when (text.lowercase()) { "true" -> true; else -> false }
             Double::class.java, java.lang.Double.TYPE -> text.toDouble()
+            Float::class.java, java.lang.Float.TYPE -> text.toFloat()
             else -> throw IllegalArgumentException("Unsupported field type: ${type.simpleName}")
         }
     }
@@ -322,7 +323,7 @@ object Dialogs {
                 Long::class.java, java.lang.Long.TYPE -> text.toLong()
                 Boolean::class.java, java.lang.Boolean.TYPE -> when (text.lowercase()) { "true" -> true; else -> false }
                 Double::class.java, java.lang.Double.TYPE -> text.toDouble()
-                java.lang.Float::class.java, java.lang.Float.TYPE -> text.toFloat()
+                Float::class.java, java.lang.Float.TYPE -> text.toFloat()
                 else -> null
             }
         }

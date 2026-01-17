@@ -11,14 +11,24 @@ class Counter(private var count: Int = 0) {
     fun get(): Int = count
 }
 
+enum class Status { NEW, RUNNING, DONE }
+
+class TestData {
+    val status = Status.NEW
+    val numbers = arrayOf(1, 2, 3, 4, 5)
+    val infoMap = mapOf("key1" to "value1", "key2" to "value2")
+    val floatNum = 3.14f
+    val doubleNum = 2.71828
+    val sampleList = listOf("alpha", "beta", "gamma")
+}
+
 object InstancesProvider {
     val instances: Array<Any> = arrayOf(
         Person("Alice", 30, Address("1 Main St", "Springfield", "12345")),
-        Person("Bob", 42, null),
         Counter(5),
         Address("2 Broadway", "Metropolis", "54321"),
-        "A simple String",
-        12345
+        TestData()
     )
 }
+
 
