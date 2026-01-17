@@ -29,6 +29,56 @@ object Dialogs {
         else -> false
     }
 
+    // Public helper: parse a simple textual value into the requested type.
+    // Returns null if it cannot be parsed (or intentionally returns null for unsupported types).
+    fun parseValuePublic(text: String, type: Class<*>, genericType: Type? = null, elementClass: Class<*>? = null): Any? {
+        return try { parseValue(text, type, genericType, elementClass) } catch (e: Exception) { null }
+    }
+
+    /**
+     * Show a simple single-value edit dialog for arbitrary types (uses internal parsing logic).
+     * callback: (success, parsedValue?, errorMessage?)
+     */
+    fun showEditValueDialog(
+        activity: AppCompatActivity?,
+        title: String,
+        hint: String,
+        initialText: String,
+        type: Class<*>,
+        genericType: Type? = null,
+        elementClass: Class<*>? = null,
+        anchor: View?,
+        callback: (Boolean, Any?, String?) -> Unit
+    ) {
+        if (activity == null) { callback(false, null, "No activity"); return }
+        val ctx = activity
+        val til = TextInputLayout(ctx)
+        val input = TextInputEditText(ctx)
+        input.hint = hint
+        input.setText(initialText)
+        til.addView(input)
+
+        val dialog = MaterialAlertDialogBuilder(ctx)
+            .setTitle(title)
+            .setView(til)
+            .setPositiveButton("OK", null)
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        dialog.show()
+        dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            val text = input.text?.toString() ?: ""
+            try {
+                val parsed = parseValue(text, type, genericType, elementClass)
+                callback(true, parsed, null)
+                dialog.dismiss()
+            } catch (e: Exception) {
+                if (anchor != null) Snackbar.make(anchor, "Error: ${e.message}", Snackbar.LENGTH_SHORT).show()
+                callback(false, null, e.message)
+            }
+        }
+    }
+
     fun showSetFieldDialog(
         activity: AppCompatActivity?,
         instance: Any,
@@ -409,4 +459,3 @@ object Dialogs {
         return null
     }
 }
-

@@ -66,6 +66,15 @@
                 app:icon="@drawable/ic_edit"
                 android:visibility="gone" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btn_delete"
+                style="?attr/materialIconButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/action_delete"
+                app:icon="@drawable/ic_delete"
+                android:visibility="gone" />
+
         </LinearLayout>
 
     </LinearLayout>

@@ -6,6 +6,7 @@ import android.view.MenuItem
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
+import android.util.Log
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -120,8 +121,130 @@ class MainActivity : AppCompatActivity() {
         value?.let { openInspectorFor(it) } ?: run { detailsText.text = getString(R.string.element_is_null) }
     }
 
+    // Return the inspection stack entry at index or null
+    fun getStackEntry(idx: Int): Any? = vm.inspectionStack.getOrNull(idx)
+
     fun onInvokeMethod(instance: Any, methodInfo: MethodInfo, detailsText: TextView) {
         Dialogs.showMethodInvocationDialog(this, instance, methodInfo.method, detailsText, binding.root)
+    }
+
+    // Replace the inspection stack entry at index `idx` with `newInstance` and refresh current inspector if shown.
+    fun replaceStackAt(idx: Int, newInstance: Any) {
+        if (idx < 0 || idx >= vm.inspectionStack.size) return
+        val oldInstance = vm.inspectionStack[idx]
+
+        // Search all earlier entries in the inspection stack (not only the immediate parent)
+        var replacedAny = false
+        for (pIdx in 0 until idx) {
+            val parent = vm.inspectionStack[pIdx]
+            try {
+                when {
+                    parent.javaClass.isArray -> {
+                        val len = java.lang.reflect.Array.getLength(parent)
+                        for (i in 0 until len) {
+                            if (java.lang.reflect.Array.get(parent, i) === oldInstance) {
+                                java.lang.reflect.Array.set(parent, i, newInstance)
+                                replacedAny = true
+                            }
+                        }
+                    }
+
+                    parent is MutableList<*> -> {
+                        @Suppress("UNCHECKED_CAST")
+                        val lst = parent as MutableList<Any?>
+                        for (i in 0 until lst.size) if (lst[i] === oldInstance) { lst[i] = newInstance; replacedAny = true }
+                    }
+
+                    parent is List<*> -> {
+                        val copy = ArrayList(parent as List<Any?>)
+                        var changed = false
+                        for (i in 0 until copy.size) if (copy[i] === oldInstance) { copy[i] = newInstance; changed = true }
+                        if (changed) {
+                            replacedAny = true
+                            replaceStackAt(pIdx, copy)
+                            // continue: the replaceStackAt call will refresh fragments for that level
+                        }
+                    }
+
+                    parent is MutableMap<*, *> -> {
+                        @Suppress("UNCHECKED_CAST")
+                        val m = parent as MutableMap<Any?, Any?>
+                        val keys = m.keys.toList()
+                        for (k in keys) if (m[k] === oldInstance) { m[k] = newInstance; replacedAny = true }
+                    }
+
+                    parent is Map<*, *> -> {
+                        val copy = LinkedHashMap(parent as Map<Any?, Any?>)
+                        var changed = false
+                        val keys = copy.keys.toList()
+                        for (k in keys) if (copy[k] === oldInstance) { copy[k] = newInstance; changed = true }
+                        if (changed) { replacedAny = true; replaceStackAt(pIdx, copy) }
+                    }
+
+                    else -> {
+                        var cur: Class<*>? = parent.javaClass
+                        while (cur != null && cur != Any::class.java) {
+                            try {
+                                for (f in cur.declaredFields) {
+                                    try {
+                                        f.isAccessible = true
+                                        val v = f.get(parent)
+                                        when {
+                                            v === oldInstance -> { setFieldValue(parent, f, newInstance); replacedAny = true }
+                                            v != null && v.javaClass.isArray -> {
+                                                val alen = java.lang.reflect.Array.getLength(v)
+                                                for (ai in 0 until alen) {
+                                                    if (java.lang.reflect.Array.get(v, ai) === oldInstance) {
+                                                        java.lang.reflect.Array.set(v, ai, newInstance)
+                                                        replacedAny = true
+                                                    }
+                                                }
+                                            }
+                                            v is MutableList<*> -> {
+                                                @Suppress("UNCHECKED_CAST")
+                                                val ml = v as MutableList<Any?>
+                                                for (i in 0 until ml.size) if (ml[i] === oldInstance) { ml[i] = newInstance; replacedAny = true }
+                                            }
+                                            v is List<*> -> {
+                                                val copyList = ArrayList(v as List<Any?>)
+                                                var changedList = false
+                                                for (i in 0 until copyList.size) if (copyList[i] === oldInstance) { copyList[i] = newInstance; changedList = true }
+                                                if (changedList) { setFieldValue(parent, f, copyList); replacedAny = true }
+                                            }
+                                            v is MutableMap<*, *> -> {
+                                                @Suppress("UNCHECKED_CAST")
+                                                val mm = v as MutableMap<Any?, Any?>
+                                                val keys = mm.keys.toList()
+                                                for (k in keys) if (mm[k] === oldInstance) { mm[k] = newInstance; replacedAny = true }
+                                            }
+                                            v is Map<*, *> -> {
+                                                val copyMap = LinkedHashMap(v as Map<Any?, Any?>)
+                                                var changedMap = false
+                                                val keys = copyMap.keys.toList()
+                                                for (k in keys) if (copyMap[k] === oldInstance) { copyMap[k] = newInstance; changedMap = true }
+                                                if (changedMap) { setFieldValue(parent, f, copyMap); replacedAny = true }
+                                            }
+                                        }
+                                    } catch (_: Exception) { /* ignore field access exceptions */ }
+                                }
+                            } catch (_: Exception) { /* ignore */ }
+                            cur = cur.superclass
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                // best-effort only — ignore any reflection failures
+            }
+        }
+
+        Log.d("ReflectionExplorer", "replaceStackAt(idx=$idx) replacedAny=$replacedAny for oldInstance=${oldInstance.javaClass.name}")
+
+        // finally store the new instance in the inspection stack
+        vm.inspectionStack[idx] = newInstance
+
+        // Ask the current InspectorFragment (if visible) to refresh its members to reflect the new object. Post to avoid in-layout mutations.
+        val frag = supportFragmentManager.findFragmentById(R.id.container) as? InspectorFragment
+        frag?.view?.post { frag.refreshMembers() }
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
@@ -145,5 +268,48 @@ class MainActivity : AppCompatActivity() {
         // Notify current InspectorFragment to refresh values (this will re-fetch field values and update adapter)
         val frag = supportFragmentManager.findFragmentById(R.id.container) as? InspectorFragment
         frag?.refreshMembers()
+    }
+
+    // Helper to set a field value on an object, attempting to temporarily clear final modifiers when necessary.
+    private fun setFieldValue(target: Any, field: java.lang.reflect.Field, value: Any?) {
+        try {
+            field.isAccessible = true
+            val modsField = java.lang.reflect.Field::class.java.getDeclaredField("modifiers")
+            modsField.isAccessible = true
+            val origMods = modsField.getInt(field)
+            // clear final bit if present
+            if ((origMods and java.lang.reflect.Modifier.FINAL) != 0) {
+                modsField.setInt(field, origMods and java.lang.reflect.Modifier.FINAL.inv())
+                try { field.set(target, value) } catch (_: Exception) {}
+                // restore
+                modsField.setInt(field, origMods)
+            } else {
+                field.set(target, value)
+            }
+        } catch (_: Exception) {
+            try { field.set(target, value) } catch (_: Exception) { /* ignore */ }
+        }
+    }
+
+    // Try setter method fallback if direct field write failed
+    // TODO: remove this fallback
+    private fun tryInvokeSetter(target: Any, field: java.lang.reflect.Field, value: Any?) {
+        try {
+            val cls = target.javaClass
+            val setterName = "set" + field.name.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
+            var cur: Class<*>? = cls
+            while (cur != null && cur != Any::class.java) {
+                try {
+                    val methods = cur.declaredMethods
+                    for (m in methods) {
+                        if (m.name == setterName && m.parameterTypes.size == 1) {
+                            m.isAccessible = true
+                            try { m.invoke(target, value); return } catch (_: Exception) { }
+                        }
+                    }
+                } catch (_: Exception) { }
+                cur = cur.superclass
+            }
+        } catch (_: Exception) { }
     }
 }

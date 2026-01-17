@@ -9,7 +9,7 @@ class MethodInfo(name: String, val method: Method) : MemberInfo(name)
 // ElementInfo represents a collection/array element by index
 class ElementInfo(name: String, val index: Int, val value: Any?) : MemberInfo(name)
 // MapEntryInfo represents a map entry by key
-class MapEntryInfo(name: String, val key: String, val value: Any?) : MemberInfo(name)
+class MapEntryInfo(name: String, val key: Any?, val value: Any?) : MemberInfo(name)
 // Header that groups members declared on a particular class
 class ClassHeaderInfo(val cls: Class<*>) : MemberInfo(cls.simpleName)
 
@@ -29,7 +29,7 @@ object ReflectionInspector {
             }
         } else if (instance is Map<*, *>) {
             instance.entries.forEach { e ->
-                members.add(MapEntryInfo("{${e.key}}", e.key.toString(), e.value))
+                members.add(MapEntryInfo("{${e.key}}", e.key, e.value))
             }
         }
 
@@ -68,5 +68,38 @@ object ReflectionInspector {
     fun invokeMethod(instance: Any, method: Method, args: Array<Any?> = emptyArray()): Any? {
         method.isAccessible = true
         return method.invoke(instance, *args)
+    }
+
+    // Find all parent references within `root` that reference `target` and return a list of ParentRef describing where they occur.
+    fun findParentRefs(root: Any, target: Any): List<ParentRef> {
+        val refs = mutableListOf<ParentRef>()
+        // search top-level if root is array/collection/map or object fields
+        when (root) {
+            is Array<*> -> {
+                for (i in 0 until java.lang.reflect.Array.getLength(root)) {
+                    if (java.lang.reflect.Array.get(root, i) === target) refs.add(ParentRef(-1, Accessor.ArrayIndex(i)))
+                }
+            }
+            is MutableList<*> -> {
+                for (i in 0 until root.size) if (root[i] === target) refs.add(ParentRef(-1, Accessor.ListIndex(i)))
+            }
+            is Map<*, *> -> {
+                for ((k, v) in root.entries) if (v === target) refs.add(ParentRef(-1, Accessor.MapKey(k.toString())))
+            }
+            else -> {
+                var cur: Class<*>? = root.javaClass
+                while (cur != null && cur != Any::class.java) {
+                    for (f in cur.declaredFields) {
+                        try {
+                            f.isAccessible = true
+                            val v = f.get(root)
+                            if (v === target) refs.add(ParentRef(-1, Accessor.Field(f.name)))
+                        } catch (_: Exception) { }
+                    }
+                    cur = cur.superclass
+                }
+            }
+        }
+        return refs
     }
 }

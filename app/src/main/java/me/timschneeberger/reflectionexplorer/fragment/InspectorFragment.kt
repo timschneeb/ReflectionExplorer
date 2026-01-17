@@ -18,6 +18,7 @@ import me.timschneeberger.reflectionexplorer.adapter.BreadcrumbAdapter
 import me.timschneeberger.reflectionexplorer.adapter.MembersAdapter
 import me.timschneeberger.reflectionexplorer.databinding.FragmentInspectorBinding
 import me.timschneeberger.reflectionexplorer.utils.ClassHeaderInfo
+import me.timschneeberger.reflectionexplorer.utils.Dialogs
 import me.timschneeberger.reflectionexplorer.utils.ElementInfo
 import me.timschneeberger.reflectionexplorer.utils.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.MapEntryInfo
@@ -103,7 +104,7 @@ class InspectorFragment : Fragment() {
         val vm = ViewModelProvider(requireActivity())[InspectorViewModel::class.java]
 
         // create and assign adapter to property
-        membersAdapter = MembersAdapter(members, inst, vm.collapsedClasses) { member ->
+        membersAdapter = MembersAdapter(members, inst, argIndex, vm.collapsedClasses) { member ->
             when (member) {
                 is FieldInfo -> activity?.onInspectField(inst, member, binding.detailsText)
                 is MethodInfo -> activity?.onInvokeMethod(inst, member, binding.detailsText)
@@ -121,7 +122,7 @@ class InspectorFragment : Fragment() {
         // observe filter changes and update members list & button highlight immediately
         mainVm.memberFilterLive.observe(viewLifecycleOwner) { f ->
             val updated = applyFilters(ReflectionInspector.listMembers(inst), mainVm)
-            membersAdapter?.update(updated)
+            membersAdapter?.update(updated, inst)
             binding.filterButton.isChecked = f.anyFiltersActive()
         }
 
@@ -132,12 +133,64 @@ class InspectorFragment : Fragment() {
             binding.filterButton.isChecked = mainVm.memberFilter.anyFiltersActive()
         }
 
+        // Set up add-element button when the inspected instance is a collection/array/map
+        binding.addElementButton.apply {
+            visibility = View.GONE
+            setOnClickListener(null)
+        }
+
+        // Determine element/value class heuristically so we can enable add/edit for simple types
+        var elementClass: Class<*>? = null
+        when (inst) {
+            is Collection<*> -> elementClass = inst.firstOrNull { it != null }?.javaClass
+            is Map<*, *> -> elementClass = inst.values.firstOrNull { it != null }?.javaClass
+            else -> if (inst.javaClass.isArray) elementClass = inst.javaClass.componentType
+        }
+
+        if (elementClass != null && Dialogs.canParseType(elementClass)) {
+            binding.addElementButton.visibility = View.VISIBLE
+            binding.addElementButton.setOnClickListener {
+                // Show a simple dialog to enter a value and append it
+                val activityCompat = (activity as? androidx.appcompat.app.AppCompatActivity) ?: return@setOnClickListener
+                Dialogs.showEditValueDialog(activityCompat, "Add element", "Value", "", elementClass, null, null, binding.root) { ok, parsed, _ ->
+                    if (!ok || parsed == null) return@showEditValueDialog
+                    when (inst) {
+                        is MutableList<*> -> {
+                            @Suppress("UNCHECKED_CAST")
+                            (inst as MutableList<Any?>).add(parsed)
+                            (activity as? MainActivity)?.replaceStackAt(argIndex, inst)
+                        }
+                        is Collection<*> -> {
+                            val newList = ArrayList(inst as Collection<Any?>)
+                            newList.add(parsed)
+                            (activity as? MainActivity)?.replaceStackAt(argIndex, newList)
+                        }
+                        is Map<*, *> -> {
+                            // for maps, create a new map and add generated key
+                            val newMap = LinkedHashMap<String, Any?>((inst as Map<String, Any?>))
+                            val newKey = "key${newMap.size}"
+                            newMap[newKey] = parsed
+                            (activity as? MainActivity)?.replaceStackAt(argIndex, newMap)
+                        }
+                        else -> if (inst.javaClass.isArray) {
+                            val comp = inst.javaClass.componentType ?: return@showEditValueDialog
+                            val len = java.lang.reflect.Array.getLength(inst)
+                            val newArr = java.lang.reflect.Array.newInstance(comp, len + 1)
+                            for (i in 0 until len) java.lang.reflect.Array.set(newArr, i, java.lang.reflect.Array.get(inst, i))
+                            java.lang.reflect.Array.set(newArr, len, parsed)
+                            (activity as? MainActivity)?.replaceStackAt(argIndex, newArr)
+                        }
+                    }
+                }
+            }
+        }
+
         viewLifecycleOwner.lifecycle.addObserver(object : DefaultLifecycleObserver {
             override fun onResume(owner: LifecycleOwner) {
                 super.onResume(owner)
                 var updated = ReflectionInspector.listMembers(inst)
                 updated = applyFilters(updated, mainVm)
-                membersAdapter?.update(updated)
+                membersAdapter?.update(updated, inst)
             }
         })
 
@@ -231,6 +284,6 @@ class InspectorFragment : Fragment() {
         val inst = mainVm.inspectionStack.getOrNull(argIndex) ?: return
         var updated = ReflectionInspector.listMembers(inst)
         updated = applyFilters(updated, ViewModelProvider(requireActivity())[MainViewModel::class.java])
-        membersAdapter?.update(updated)
+        membersAdapter?.update(updated, inst)
     }
 }

@@ -2,7 +2,6 @@ package me.timschneeberger.reflectionexplorer.adapter
 
 import android.annotation.SuppressLint
 import android.view.LayoutInflater
-import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
@@ -24,13 +23,17 @@ import me.timschneeberger.reflectionexplorer.utils.dpToPx
 import me.timschneeberger.reflectionexplorer.utils.getFieldDrawable
 import me.timschneeberger.reflectionexplorer.utils.getMethodDrawable
 import java.lang.reflect.Array
+import java.util.LinkedHashMap
 
 private const val TYPE_HEADER = 0
 private const val TYPE_MEMBER = 1
 
 class MembersAdapter(
     items: List<MemberInfo>,
-    private val rootInstance: Any,
+    // rootInstance can change when we replace arrays/lists/maps; make it mutable
+    var rootInstance: Any,
+    // index of this inspected instance in the global inspection stack (used to replace arrays/lists/maps)
+    private val stackIndex: Int,
     // external set (from ViewModel) to persist collapsed state across rotations
     private val collapsedClasses: MutableSet<String>,
     private val onClick: (MemberInfo) -> Unit
@@ -40,6 +43,10 @@ class MembersAdapter(
     private var visibleItems: MutableList<MemberInfo> = mutableListOf()
 
     init { rebuildVisible() }
+
+    // Helpers to safely access arrays without throwing when concurrently modified
+    private fun safeArrayLength(arr: Any?): Int = try { if (arr != null && arr.javaClass.isArray) Array.getLength(arr) else 0 } catch (_: Exception) { 0 }
+    private fun safeArrayGet(arr: Any?, idx: Int): Any? = try { if (arr != null && arr.javaClass.isArray) { val len = Array.getLength(arr); if (idx in 0 until len) Array.get(arr, idx) else null } else null } catch (_: Exception) { null }
 
     class VH(val binding: ItemMemberBinding) : RecyclerView.ViewHolder(binding.root)
     class HeaderVH(val binding: ItemMemberHeaderBinding) : RecyclerView.ViewHolder(binding.root)
@@ -76,6 +83,9 @@ class MembersAdapter(
                     setBackgroundResource(bg)
                 }
             }
+
+            holder.binding.btnSet.isVisible = false
+            holder.binding.btnDelete.isVisible = false
         }
 
         when (item) {
@@ -137,21 +147,13 @@ class MembersAdapter(
 
             btnSet.isVisible = Dialogs.canParseType(item.field.type)
             btnSet.setOnClickListener {
-                val ctx = root.context
-                (ctx as? MainActivity)?.let { act ->
-                    act.showSetFieldDialog(rootInstance, item) { ok, errMsg ->
-                        if (ok) {
-                            // refresh after successful set
-                            try {
-                                val newV = ReflectionInspector.getField(rootInstance, item.field)
-                                memberSubtitle.text = "${item.field.type.simpleName} -> ${formatPreview(v = newV)}"
-                            } catch (_: Exception) { /* ignore */ }
-                        } else if (errMsg != null) {
-                            memberSubtitle.text = "<error: $errMsg>"
-                        }
-                    }
+                val act = root.context as? MainActivity ?: return@setOnClickListener
+                // show dialog to set field value; on success, propagate change into stack
+                act.showSetFieldDialog(rootInstance, item) { ok, _ ->
+                    if (ok) act.replaceStackAt(stackIndex, rootInstance)
                 }
             }
+
 
             root.setOnClickListener { onClick(item) }
         }
@@ -163,7 +165,6 @@ class MembersAdapter(
             memberTitle.text = "${item.name}($params)"
             memberSubtitle.text = "-> ${item.method.returnType.simpleName}"
             memberIcon.setImageDrawable(item.method.getMethodDrawable(root.context) ?: ContextCompat.getDrawable(root.context, R.drawable.ic_method))
-            btnSet.isVisible = false
             root.setOnClickListener { onClick(item) }
         }
     }
@@ -171,25 +172,157 @@ class MembersAdapter(
     private fun bindElement(hv: VH, item: ElementInfo, preview: String) {
         hv.binding.apply {
             memberTitle.text = item.name
-            memberSubtitle.text = item.value?.let { it::class.java.simpleName + " -> " + preview } ?: "null"
+
+            // Safely resolve the current element value from the (possibly replaced) rootInstance.
+            val currentValue: Any? = when {
+                rootInstance is List<*> -> {
+                    val lst = rootInstance as List<*>
+                    if (item.index in 0 until lst.size) lst[item.index] else null
+                }
+                rootInstance.javaClass.isArray -> {
+                    val len = try { Array.getLength(rootInstance) } catch (_: Exception) { 0 }
+                    if (item.index in 0 until len) Array.get(rootInstance, item.index) else null
+                }
+                else -> null
+            }
+
             memberIcon.setImageResource(R.drawable.ic_class)
-            btnSet.isVisible = false
+            memberSubtitle.text = currentValue?.let { it::class.java.simpleName + " -> " + formatPreview(it) } ?: "null"
+
+            // show edit/delete when applicable; guard by currentValue presence and index bounds
+            btnSet.isVisible = currentValue != null && Dialogs.canParseType(currentValue::class.java)
+            btnDelete.isVisible = when (rootInstance) {
+                is List<*> -> item.index in 0 until (rootInstance as List<*>).size
+                else -> rootInstance.javaClass.isArray && try { item.index in 0 until Array.getLength(rootInstance) } catch (_: Exception) { false }
+            }
+
+            btnDelete.setOnClickListener {
+                val act = root.context as? MainActivity ?: return@setOnClickListener
+                when (rootInstance) {
+                    is List<*> -> {
+                        // create a mutable copy to avoid UnsupportedOperationException from fixed-size lists
+                        @Suppress("UNCHECKED_CAST")
+                        val copy = (rootInstance as List<Any?>).toMutableList()
+                        if (item.index in 0 until copy.size) {
+                            try {
+                                copy.removeAt(item.index)
+                            } catch (_: UnsupportedOperationException) {
+                                // fallback: create a new list excluding the index
+                                val filtered = copy.filterIndexed { idx, _ -> idx != item.index }.toMutableList()
+                                act.replaceStackAt(stackIndex, filtered)
+                                return@setOnClickListener
+                            }
+                            act.replaceStackAt(stackIndex, copy)
+                        }
+                    }
+                    else -> if (rootInstance.javaClass.isArray) {
+                        val comp = rootInstance.javaClass.componentType ?: return@setOnClickListener
+                        val len = Array.getLength(rootInstance)
+                        if (item.index in 0 until len) {
+                            val newArr = Array.newInstance(comp, (len - 1).coerceAtLeast(0))
+                            var dst = 0
+                            for (i in 0 until len) {
+                                if (i == item.index) continue
+                                Array.set(newArr, dst++, Array.get(rootInstance, i))
+                            }
+                            act.replaceStackAt(stackIndex, newArr)
+                        }
+                    }
+                }
+            }
+
+            btnSet.setOnClickListener {
+                val act = root.context as? MainActivity ?: return@setOnClickListener
+                val elemClass = currentValue?.javaClass ?: return@setOnClickListener
+                val initial = currentValue?.toString() ?: ""
+                Dialogs.showEditValueDialog(act, "Edit element", "Value", initial, elemClass, null, null, root) { ok, parsed, _ ->
+                    if (!ok || parsed == null) return@showEditValueDialog
+                    when (rootInstance) {
+                        is MutableList<*> -> {
+                            @Suppress("UNCHECKED_CAST")
+                            val lst = rootInstance as MutableList<Any?>
+                            if (item.index in 0 until lst.size) lst[item.index] = parsed
+                            act.replaceStackAt(stackIndex, rootInstance)
+                        }
+                        is List<*> -> {
+                            @Suppress("UNCHECKED_CAST")
+                            val copy = (rootInstance as List<Any?>).toMutableList()
+                            if (item.index in 0 until copy.size) copy[item.index] = parsed
+                            act.replaceStackAt(stackIndex, copy)
+                        }
+                        else -> if (rootInstance.javaClass.isArray) {
+                            val len = Array.getLength(rootInstance)
+                            if (item.index in 0 until len) Array.set(rootInstance, item.index, parsed)
+                            act.replaceStackAt(stackIndex, rootInstance)
+                        }
+                    }
+                }
+            }
+
             root.setOnClickListener { onClick(item) }
         }
     }
 
     private fun bindMapEntry(hv: VH, item: MapEntryInfo, preview: String) {
         hv.binding.apply {
-            memberTitle.text = item.key
+            memberTitle.text = item.key?.toString() ?: ""
             memberSubtitle.text = item.value?.let { it::class.java.simpleName + " -> " + preview } ?: "null"
             memberIcon.setImageResource(R.drawable.ic_field)
             btnSet.isVisible = false
+            btnDelete.isVisible = false
+
+            // maps: allow delete and edit of value when possible
+            if (rootInstance is MutableMap<*, *>) {
+                btnDelete.isVisible = true
+                btnSet.isVisible = item.value != null && Dialogs.canParseType(item.value::class.java)
+            } else if (rootInstance is Map<*, *>) {
+                btnDelete.isVisible = true
+                btnSet.isVisible = item.value != null && Dialogs.canParseType(item.value::class.java)
+            }
+
+            btnDelete.setOnClickListener {
+                val activity = root.context as? MainActivity ?: return@setOnClickListener
+                if (rootInstance is MutableMap<*, *>) {
+                    @Suppress("UNCHECKED_CAST")
+                    val m = rootInstance as MutableMap<Any?, Any?>
+                    m.remove(item.key)
+                    activity.replaceStackAt(stackIndex, rootInstance)
+                } else if (rootInstance is Map<*, *>) {
+                    @Suppress("UNCHECKED_CAST")
+                    val copy = LinkedHashMap(rootInstance as Map<Any?, Any?>)
+                    copy.remove(item.key)
+                    activity.replaceStackAt(stackIndex, copy)
+                }
+            }
+
+            btnSet.setOnClickListener {
+                val activity = root.context as? MainActivity ?: return@setOnClickListener
+                val valueClass = item.value?.javaClass
+                if (valueClass != null) {
+                    Dialogs.showEditValueDialog(activity, "Edit value", "Value", item.value?.toString() ?: "", valueClass, null, null, root) { ok, parsed, _ ->
+                        if (!ok || parsed == null) return@showEditValueDialog
+                        if (rootInstance is MutableMap<*, *>) {
+                            @Suppress("UNCHECKED_CAST")
+                            val m = rootInstance as MutableMap<Any?, Any?>
+                            m[item.key] = parsed
+                            activity.replaceStackAt(stackIndex, rootInstance)
+                        } else if (rootInstance is Map<*, *>) {
+                            @Suppress("UNCHECKED_CAST")
+                            val copy = LinkedHashMap(rootInstance as Map<Any?, Any?>)
+                            copy[item.key] = parsed
+                            activity.replaceStackAt(stackIndex, copy)
+                        }
+                    }
+                }
+            }
+
             root.setOnClickListener { onClick(item) }
         }
     }
 
     @SuppressLint("NotifyDataSetChanged")
-    fun update(newItems: List<MemberInfo>) {
+    fun update(newItems: List<MemberInfo>, newRootInstance: Any? = null) {
+        newRootInstance?.let { this.rootInstance = it }
         fullItems = newItems
         rebuildVisible()
         notifyDataSetChanged()
