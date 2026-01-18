@@ -14,10 +14,11 @@ import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import com.google.android.material.checkbox.MaterialCheckBox
 import me.timschneeberger.reflectionexplorer.R
+import java.lang.reflect.Field
 import java.lang.reflect.Method
+import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 
-@SuppressLint("SetTextI18n")
 object Dialogs {
     private fun showSimpleInputDialog(
         context: Context,
@@ -28,6 +29,7 @@ object Dialogs {
     ) {
         val til = TextInputLayout(context).apply {
             addView(TextInputEditText(context).apply { this.hint = hint; setText(initialText) })
+            setPadding(24.dpToPx(), 12.dpToPx(), 24.dpToPx(), 0)
         }
 
         MaterialAlertDialogBuilder(context)
@@ -35,31 +37,30 @@ object Dialogs {
             .setView(til)
             .setPositiveButton(context.getString(R.string.ok), null)
             .setNegativeButton(context.getString(R.string.cancel), null)
-             .create()
-             .also { dialog ->
-                 dialog.show()
-                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                     val text = (til.editText as? TextInputEditText)?.text?.toString() ?: ""
-                     onOk(text)
-                     dialog.dismiss()
-                 }
-             }
-     }
+            .create()
+            .also { dialog ->
+                dialog.show()
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                    onOk((til.editText as? TextInputEditText)?.text?.toString() ?: "")
+                    dialog.dismiss()
+                }
+            }
+    }
 
-     // Helper to create a TextInputEditText with optional text-change callback to avoid repeated TextWatcher code
-     private fun createTextInput(context: Context, hint: String = "", inputType: Int = android.text.InputType.TYPE_CLASS_TEXT, onChanged: (() -> Unit)? = null): TextInputEditText {
-         return TextInputEditText(context).apply {
-             this.hint = hint
-             this.inputType = inputType
-             onChanged?.let { callback ->
-                 addTextChangedListener(object : android.text.TextWatcher {
-                     override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                     override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { callback() }
-                     override fun afterTextChanged(s: android.text.Editable?) {}
-                 })
-             }
-         }
-     }
+    // Helper to create a TextInputEditText with optional text-change callback to avoid repeated TextWatcher code
+    private fun createTextInput(context: Context, hint: String = "", inputType: Int = android.text.InputType.TYPE_CLASS_TEXT, onChanged: (() -> Unit)? = null): TextInputEditText {
+        return TextInputEditText(context).apply {
+            this.hint = hint
+            this.inputType = inputType
+            onChanged?.let { callback ->
+                addTextChangedListener(object : android.text.TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { callback() }
+                    override fun afterTextChanged(s: android.text.Editable?) {}
+                })
+            }
+        }
+    }
 
     // Parsing helpers are centralized in ReflectionParser
 
@@ -94,11 +95,11 @@ object Dialogs {
     ) {
         val field = fieldInfo.field
         showSimpleInputDialog(context, context.getString(R.string.set_field_title, field.name), context.getString(R.string.set_field_hint, field.name, field.type.simpleName), "") { text ->
-             setFieldFromText(context, anchor, instance, field, text)
-                 .onSuccess { callback(true, null) }
-                 .onFailure { e -> callback(false, e.message) }
-         }
-     }
+            setFieldFromText(context, anchor, instance, field, text)
+                .onSuccess { callback(true, null) }
+                .onFailure { e -> callback(false, e.message) }
+        }
+    }
 
     fun showMethodInvocationDialog(
         context: Context,
@@ -168,13 +169,13 @@ object Dialogs {
                 if (comp != null && comp != Any::class.java) chosenElementClasses[i] = comp else needsElementSelector = true
             } else if (java.util.List::class.java.isAssignableFrom(pClass) || java.util.Collection::class.java.isAssignableFrom(pClass)) {
                 val gen = genericTypes.getOrNull(i)
-                if (gen is java.lang.reflect.ParameterizedType) {
+                if (gen is ParameterizedType) {
                     val arg = gen.actualTypeArguments.getOrNull(0)
                     if (arg is Class<*>) chosenElementClasses[i] = arg else needsElementSelector = true
                 } else needsElementSelector = true
             } else if (java.util.Map::class.java.isAssignableFrom(pClass)) {
                 val gen = genericTypes.getOrNull(i)
-                if (gen is java.lang.reflect.ParameterizedType) {
+                if (gen is ParameterizedType) {
                     val arg = gen.actualTypeArguments.getOrNull(1)
                     if (arg is Class<*>) chosenElementClasses[i] = arg else needsElementSelector = true
                 } else needsElementSelector = true
@@ -191,22 +192,22 @@ object Dialogs {
                             MaterialAlertDialogBuilder(context)
                                 .setTitle(context.getString(R.string.enter_element_class))
                                 .setView(inputClass)
-                                .setPositiveButton("OK") { _, _ ->
+                                .setPositiveButton(context.getString(R.string.ok)) { _, _ ->
                                     val fqcn = inputClass.text.toString().trim()
                                     chosenElementClasses[i] = runCatching { Class.forName(fqcn) }.getOrElse {
                                         anchor?.let { Snackbar.make(it, context.getString(R.string.could_not_load_class, fqcn), Snackbar.LENGTH_SHORT).show() }
-                                         String::class.java
-                                     }
-                                     updatePreview()
-                                 }
+                                        String::class.java
+                                    }
+                                    updatePreview()
+                                }
                                 .setNegativeButton(context.getString(R.string.cancel)) { _, _ -> chosenElementClasses[i] = String::class.java; updatePreview() }
-                                 .show()
-                         } else {
-                             chosenElementClasses[i] = typeClassMap[choice]
-                             updatePreview()
-                         }
-                     }
-                 }
+                                .show()
+                        } else {
+                            chosenElementClasses[i] = typeClassMap[choice]
+                            updatePreview()
+                        }
+                    }
+                }
                 til.addView(auto)
                 layout.addView(til)
                 inputViews.add(auto)
@@ -220,7 +221,9 @@ object Dialogs {
                     inputViews.add(cb)
                     layout.addView(cb)
                 }
-                Int::class.java, Int::class.javaPrimitiveType!!, Long::class.java, Long::class.javaPrimitiveType!!, Double::class.java, Double::class.javaPrimitiveType!! -> {
+                Int::class.java, Int::class.javaPrimitiveType!!,
+                Long::class.java, Long::class.javaPrimitiveType!!,
+                Double::class.java, Double::class.javaPrimitiveType!! -> {
                     val til = TextInputLayout(context)
                     val inputType = when (pClass) {
                         Int::class.java, Int::class.javaPrimitiveType!! -> android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
@@ -240,13 +243,13 @@ object Dialogs {
                 else -> {
                     val til = TextInputLayout(context)
                     val hintTxt = if (pClass.isArray || java.util.Collection::class.java.isAssignableFrom(pClass) || java.util.Map::class.java.isAssignableFrom(pClass)) context.getString(R.string.use_array_hint) else ""
-                     val txt = createTextInput(context, hint = hintTxt) { updatePreview() }
-                     til.addView(txt)
-                     inputViews.add(txt)
-                     layout.addView(til)
-                 }
-             }
-         }
+                    val txt = createTextInput(context, hint = hintTxt) { updatePreview() }
+                    til.addView(txt)
+                    inputViews.add(txt)
+                    layout.addView(til)
+                }
+            }
+        }
 
         params.forEachIndexed { i, pClass -> addParamInput(i, pClass) }
 
@@ -254,28 +257,29 @@ object Dialogs {
         layout.setPadding(24.dpToPx(), 12.dpToPx(), 24.dpToPx(), 0)
         updatePreview()
 
-        val dialog = MaterialAlertDialogBuilder(context)
+        MaterialAlertDialogBuilder(context)
             .setTitle(context.getString(R.string.invoke_title, method.name))
-             .setView(layout)
-             .setPositiveButton(context.getString(R.string.invoke), null)
-             .setNegativeButton(context.getString(R.string.cancel), null)
-             .create()
+            .setView(layout)
+            .setPositiveButton(context.getString(R.string.invoke), null)
+            .setNegativeButton(context.getString(R.string.cancel), null)
+            .create()
+            .apply {
+                show()
 
-        dialog.show()
-
-        dialog.getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
-                 val args = params.mapIndexed { i, t ->
-                 when (val view = inputViews[i]) {
-                     is MaterialCheckBox -> view.isChecked as Any
-                     is TextInputEditText -> ReflectionParser.parseValue(view.text.toString(), t, genericTypes.getOrNull(i), chosenElementClasses.getOrNull(i))
-                     is MaterialAutoCompleteTextView -> if (t.isEnum) ReflectionParser.enumConstantFor(t, view.text.toString()) else null
-                     else -> null
-                 }
-             }.toTypedArray()
-             invokeAndShowResult(context, instance, method, args, detailsText, anchor)
-                 dialog.dismiss()
-             }
-     }
+                getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+                    val args = params.mapIndexed { i, t ->
+                        when (val view = inputViews[i]) {
+                            is MaterialCheckBox -> view.isChecked as Any
+                            is TextInputEditText -> ReflectionParser.parseValue(view.text.toString(), t, genericTypes.getOrNull(i), chosenElementClasses.getOrNull(i))
+                            is MaterialAutoCompleteTextView -> if (t.isEnum) ReflectionParser.enumConstantFor(t, view.text.toString()) else null
+                            else -> null
+                        }
+                    }.toTypedArray()
+                    invokeAndShowResult(context, instance, method, args, detailsText, anchor)
+                    dismiss()
+                }
+            }
+    }
 
     // Parse a value and show an error snackbar anchored at [anchor] on failure. Returns Result of parseValue.
     private fun parseValueWithSnackbar(context: Context, anchor: View?, text: String, type: Class<*>, genericType: Type?, elementClass: Class<*>?): Result<Any?> {
@@ -283,7 +287,7 @@ object Dialogs {
     }
 
     // Parse [text] as [field.type] and set the field on [instance]; show snackbar on parse/set failure when [anchor] is provided.
-    private fun setFieldFromText(context: Context, anchor: View?, instance: Any, field: java.lang.reflect.Field, text: String): Result<Unit> {
+    private fun setFieldFromText(context: Context, anchor: View?, instance: Any, field: Field, text: String): Result<Unit> {
         return runWithErrorSnackbar(context, anchor) {
             val parsed = ReflectionParser.parseValue(text, field.type, null, null) ?: throw IllegalArgumentException("Could not parse value for type ${field.type.simpleName}")
             instance.setField(field, parsed)
