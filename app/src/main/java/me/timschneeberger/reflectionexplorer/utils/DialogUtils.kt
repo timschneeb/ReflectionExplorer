@@ -158,6 +158,7 @@ object Dialogs {
                 val auto = MaterialAutoCompleteTextView(context).apply {
                     setAdapter(ArrayAdapter(context, android.R.layout.simple_list_item_1, enums))
                     setOnItemClickListener { _, _, _, _ -> updatePreview() }
+                    threshold = 0
                 }
                 til.addView(auto)
                 inputViews.add(auto)
@@ -220,7 +221,10 @@ object Dialogs {
             // Now handle simple types
             when (pClass) {
                 Boolean::class.javaObjectType, Boolean::class.javaPrimitiveType!! -> {
-                    val cb = MaterialCheckBox(context).apply { isChecked = false; setOnCheckedChangeListener { _, _ -> updatePreview() } }
+                    val cb = MaterialCheckBox(context).apply {
+                        isChecked = false;
+                        setOnCheckedChangeListener { _, _ -> updatePreview() }
+                    }
                     inputViews.add(cb)
                     layout.addView(cb)
                 }

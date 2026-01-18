@@ -16,7 +16,7 @@ class Counter(private var count: Int = 0) {
 enum class Status { NEW, RUNNING, DONE }
 
 class TestData {
-    val status = Status.NEW
+    var status = Status.NEW
     val numbers = arrayOf(1, 2, 3, 4, 5)
     val infoMap = mapOf("key1" to "value1", "key2" to "value2")
     val floatNum = 3.14f

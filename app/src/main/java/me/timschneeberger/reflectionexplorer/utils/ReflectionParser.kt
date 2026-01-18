@@ -12,7 +12,7 @@ object ReflectionParser {
         Boolean::class.javaObjectType, Boolean::class.javaPrimitiveType!!,
         Float::class.javaObjectType, Float::class.javaPrimitiveType!!,
         Double::class.javaObjectType, Double::class.javaPrimitiveType!! -> true
-        else -> false
+        else -> type.isEnum
     }
 
     private fun parsePrimitiveType(text: String, type: Class<*>): Any? {
@@ -76,6 +76,7 @@ object ReflectionParser {
             return map
         }
 
+        if (type.isEnum) enumConstantFor(type, text)?.let { return it }
         if (type.isArray) return parseArrayValue()
         if (java.util.List::class.java.isAssignableFrom(type) || java.util.Collection::class.java.isAssignableFrom(type)) return parseCollectionValue()
         if (java.util.Map::class.java.isAssignableFrom(type)) return parseMapValue()
@@ -89,4 +90,3 @@ object ReflectionParser {
         return null
     }
 }
-
