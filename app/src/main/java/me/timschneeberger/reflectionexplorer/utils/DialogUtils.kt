@@ -23,34 +23,8 @@ import java.lang.reflect.Type
 import android.view.ViewGroup
 import androidx.core.widget.NestedScrollView
 
+// TODO: deduplicate this and cleanup
 object Dialogs {
-    private fun showSimpleInputDialog(
-        context: Context,
-        title: String,
-        hint: String,
-        initialText: String,
-        onOk: (String) -> Unit
-    ) {
-        val til = TextInputLayout(context).apply {
-            addView(TextInputEditText(context).apply { this.hint = hint; setText(initialText) })
-            setPadding(24.dpToPx(), 12.dpToPx(), 24.dpToPx(), 0)
-        }
-
-        MaterialAlertDialogBuilder(context)
-            .setTitle(title)
-            .setView(til)
-            .setPositiveButton(context.getString(R.string.ok), null)
-            .setNegativeButton(context.getString(R.string.cancel), null)
-            .create()
-            .also { dialog ->
-                dialog.show()
-                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                    onOk((til.editText as? TextInputEditText)?.text?.toString() ?: "")
-                    dialog.dismiss()
-                }
-            }
-    }
-
     private fun createTextInput(context: Context, hint: String = "", default: String = "", inputType: Int = InputType.TYPE_CLASS_TEXT, onChanged: (() -> Unit)? = null): TextInputEditText {
         return TextInputEditText(context).apply {
             this.text = Editable.Factory.getInstance().newEditable(default)

@@ -63,27 +63,29 @@ abstract class ExpandableListAdapter<T : Any>(items: List<T>,
 
     /** Apply rounded background resource selection logic to any container view based on header groups. */
     protected fun applyRoundedBackground(container: View, position: Int,
-                                         topRes: Int = R.drawable.bg_member_top,
-                                         bottomRes: Int = R.drawable.bg_member_bottom,
-                                         middleRes: Int = R.drawable.bg_member_middle,
-                                         singleRes: Int = R.drawable.bg_member_single) {
+                                          topRes: Int = R.drawable.bg_member_top,
+                                          bottomRes: Int = R.drawable.bg_member_bottom,
+                                          middleRes: Int = R.drawable.bg_member_middle,
+                                          singleRes: Int = R.drawable.bg_member_single,
+                                          forceSingle: Boolean = false) {
+
+        // Group under nearest preceding header. If no header before, group starts at 0.
         val headerIndex = (position - 1 downTo 0).firstOrNull { isHeader(visibleItems[it]) } ?: -1
-        if (headerIndex == -1) {
-            // TODO doesn't handle row group before first header
-            container.setBackgroundResource(singleRes)
-        } else {
-            val start = headerIndex + 1
-            var end = start
-            while (end < visibleItems.size && !isHeader(visibleItems[end])) end++
-            val count = end - start
-            val bg = when {
-                count <= 1 -> singleRes
-                position - start == 0 -> topRes
-                position - start == count - 1 -> bottomRes
+        val start = if (headerIndex == -1) 0 else headerIndex + 1
+        var end = start
+        while (end < visibleItems.size && !isHeader(visibleItems[end])) end++
+        val cnt = end - start
+        val indexInGroup = position - start
+
+        container.setBackgroundResource(
+            when {
+                forceSingle -> singleRes
+                cnt <= 1 -> singleRes
+                indexInGroup <= 0 -> topRes
+                indexInGroup >= cnt - 1 -> bottomRes
                 else -> middleRes
             }
-            container.setBackgroundResource(bg)
-        }
+        )
     }
 
     companion object {

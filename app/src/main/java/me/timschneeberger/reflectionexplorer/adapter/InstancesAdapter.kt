@@ -27,7 +27,7 @@ class InstancesAdapter(
         item: Any
     ) {
         (holder as VH).binding.apply {
-            applyRoundedBackground(instanceContainer, visibleItems.indexOf(item))
+            applyRoundedBackground(instanceContainer, visibleItems.indexOf(item), forceSingle = true)
 
             itemTitle.text = item::class.java.simpleName
             itemSubtitle.text = item.toString()
