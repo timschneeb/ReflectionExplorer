@@ -85,7 +85,6 @@
             android:layout_weight="1"
             android:maxLines="6"
             android:ellipsize="middle"
-            android:visibility="gone"
             android:text="" />
 
         <ImageButton

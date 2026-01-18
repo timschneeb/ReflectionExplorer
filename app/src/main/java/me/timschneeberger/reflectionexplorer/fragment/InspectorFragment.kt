@@ -216,7 +216,7 @@ class InspectorFragment : Fragment() {
     }
 
     private fun openNewInspectorActivityFor(instance: Any?) {
-        // TODO implement
+        // TODO implement menu
     }
 
     private fun applyFilters(members: List<MemberInfo>, mainVm: MainViewModel): List<MemberInfo> {
