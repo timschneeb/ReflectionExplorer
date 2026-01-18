@@ -23,6 +23,7 @@ import me.timschneeberger.reflectionexplorer.utils.Dialogs.showMethodInvocationD
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showSetFieldDialog
 import me.timschneeberger.reflectionexplorer.utils.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.MethodInfo
+import me.timschneeberger.reflectionexplorer.utils.canInspectType
 import me.timschneeberger.reflectionexplorer.utils.getField
 import me.timschneeberger.reflectionexplorer.utils.replaceReferences
 
@@ -79,16 +80,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun openInspectorFor(instance: Any?) {
-        if (instance == null) return
-
-        // If primitive or simple boxed type, do not open inspector
-        if (instance::class.java.isPrimitive ||
-            instance is java.lang.String || instance is java.lang.Number ||
-            instance is java.lang.Boolean || instance is Character
-        ) {
-            Toast.makeText(this, "Cannot inspect primitive or simple types", Toast.LENGTH_SHORT).show()
+        if (instance == null || !instance.canInspectType())
             return
-        }
 
         vm.inspectionStack.add(instance)
         val idx = vm.inspectionStack.size - 1

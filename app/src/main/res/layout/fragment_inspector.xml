@@ -68,12 +68,34 @@
         android:layout_height="0dp"
         android:layout_weight="1" />
 
-    <TextView
-        android:id="@+id/details_text"
+    <!-- details row: text + menu button -->
+    <LinearLayout
+        android:id="@+id/details_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:visibility="gone"
         android:padding="8dp"
-        android:text=""
-        android:visibility="gone" />
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/details_text"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="6"
+            android:ellipsize="middle"
+            android:visibility="gone"
+            android:text="" />
+
+        <ImageButton
+            android:id="@+id/details_menu_button"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:visibility="gone"
+            android:contentDescription="@string/filter"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            app:srcCompat="@drawable/ic_more_vert" />
+    </LinearLayout>
 
 </LinearLayout>

@@ -19,7 +19,6 @@ import me.timschneeberger.reflectionexplorer.adapter.MembersAdapter
 import me.timschneeberger.reflectionexplorer.databinding.FragmentInspectorBinding
 import me.timschneeberger.reflectionexplorer.utils.ClassHeaderInfo
 import me.timschneeberger.reflectionexplorer.utils.CollectionMember
-import me.timschneeberger.reflectionexplorer.utils.Dialogs
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showEditValueDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showErrorDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showMethodInvocationDialog
@@ -30,6 +29,7 @@ import me.timschneeberger.reflectionexplorer.utils.MethodInfo
 import me.timschneeberger.reflectionexplorer.utils.MemberInfo
 import me.timschneeberger.reflectionexplorer.utils.ReflectionParser
 import me.timschneeberger.reflectionexplorer.utils.appendToArray
+import me.timschneeberger.reflectionexplorer.utils.canInspectType
 import me.timschneeberger.reflectionexplorer.utils.formatObject
 import me.timschneeberger.reflectionexplorer.utils.getField
 import me.timschneeberger.reflectionexplorer.utils.listMembers
@@ -96,9 +96,11 @@ class InspectorFragment : Fragment() {
                     activity?.showErrorDialog(e)
                 }
                 is MethodInfo -> activity?.showMethodInvocationDialog(instance, member.method, binding.root) {
-                    binding.detailsText.apply {
-                        text = getString(R.string.invoked_result, member.method.name, it?.toString() ?: "null")
-                        isVisible = true
+                    binding.detailsContainer.isVisible = true
+                    binding.detailsText.text = getString(R.string.invoked_result, member.method.name, it?.toString() ?: "null")
+                    binding.detailsMenuButton.apply {
+                        isVisible = it.canInspectType()
+                        setOnClickListener(::openNewInspectorActivityFor)
                     }
                 }
                 is ElementInfo -> activity?.openInspectorFor(member.value)
@@ -211,6 +213,10 @@ class InspectorFragment : Fragment() {
         })
 
         return binding.root
+    }
+
+    private fun openNewInspectorActivityFor(instance: Any?) {
+        // TODO implement
     }
 
     private fun applyFilters(members: List<MemberInfo>, mainVm: MainViewModel): List<MemberInfo> {

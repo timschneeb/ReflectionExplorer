@@ -31,4 +31,5 @@
     <string name="use_array_hint">Use [a,b] or {k:v}</string>
     <string name="invoke">Invoke</string>
     <string name="filter">Filter</string>
+    <string name="action_open_inspector">Open in new inspector</string>
 </resources>

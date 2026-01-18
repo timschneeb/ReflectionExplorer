@@ -77,6 +77,12 @@ class MapEntryInfo(name: String, val key: Any?, val value: Any?) : MemberInfo(na
 // Header that groups members declared on a particular class
 class ClassHeaderInfo(val cls: Class<*>) : MemberInfo(cls.simpleName)
 
+// Determine whether the given instance can be meaningfully inspected (is not a primitive wrapper or String)
+fun Any?.canInspectType(): Boolean =
+    !(this != null && this::class.java.isPrimitive ||
+            this is java.lang.String || this is java.lang.Number ||
+            this is java.lang.Boolean || this is Character)
+
 fun Any?.formatObject(ctx: Context, additionalTypeInfo: GettableMember?, withType: Boolean = true): String = try {
     var type = this?.javaClass?.simpleName ?: additionalTypeInfo?.getType(this ?: Any())?.simpleName ?: "Unknown"
     val value = when (this) {
