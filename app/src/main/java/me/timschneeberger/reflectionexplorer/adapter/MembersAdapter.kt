@@ -162,7 +162,6 @@ class MembersAdapter(
                 }
                 Dialogs.showEditValueDialog(
                     activity, activity.getString(R.string.action_set_value),
-                    activity.getString(R.string.action_set_value),
                     value, type, null, null, anchor
                 ) { ok, parsed, _ ->
                     if (!ok || parsed == null) return@showEditValueDialog

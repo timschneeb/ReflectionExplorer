@@ -136,7 +136,7 @@ class InspectorFragment : Fragment() {
             binding.addElementButton.setOnClickListener {
                 // Show a simple dialog to enter a value and append it
                 activity ?: return@setOnClickListener
-                Dialogs.showEditValueDialog(activity, "Add element", "Value", "", collectionType, null, keyType, binding.root) { ok, parsed, _ ->
+                Dialogs.showEditValueDialog(activity, "Add element", "", collectionType, null, keyType, binding.root) { ok, parsed, _ ->
                     if (!ok || parsed == null) return@showEditValueDialog
                     when {
                         // Prefer in-place mutation when the concrete list supports it.
