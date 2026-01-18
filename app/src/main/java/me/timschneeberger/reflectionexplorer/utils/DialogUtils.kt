@@ -3,6 +3,9 @@ package me.timschneeberger.reflectionexplorer.utils
 import android.content.Context
 import android.view.View
 import android.annotation.SuppressLint
+import android.text.Editable
+import android.text.InputType
+import android.text.TextWatcher
 import android.widget.ArrayAdapter
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -18,6 +21,8 @@ import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
+import android.view.ViewGroup
+import androidx.core.widget.NestedScrollView
 
 object Dialogs {
     private fun showSimpleInputDialog(
@@ -47,22 +52,20 @@ object Dialogs {
             }
     }
 
-    // Helper to create a TextInputEditText with optional text-change callback to avoid repeated TextWatcher code
-    private fun createTextInput(context: Context, hint: String = "", inputType: Int = android.text.InputType.TYPE_CLASS_TEXT, onChanged: (() -> Unit)? = null): TextInputEditText {
+    private fun createTextInput(context: Context, hint: String = "", default: String = "", inputType: Int = InputType.TYPE_CLASS_TEXT, onChanged: (() -> Unit)? = null): TextInputEditText {
         return TextInputEditText(context).apply {
+            this.text = Editable.Factory.getInstance().newEditable(default)
             this.hint = hint
             this.inputType = inputType
             onChanged?.let { callback ->
-                addTextChangedListener(object : android.text.TextWatcher {
+                addTextChangedListener(object : TextWatcher {
                     override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
                     override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { callback() }
-                    override fun afterTextChanged(s: android.text.Editable?) {}
+                    override fun afterTextChanged(s: Editable?) {}
                 })
             }
         }
     }
-
-    // Parsing helpers are centralized in ReflectionParser
 
     /**
      * Show a single-value edit dialog for arbitrary types.
@@ -226,16 +229,16 @@ object Dialogs {
                 Double::class.java, Double::class.javaPrimitiveType!! -> {
                     val til = TextInputLayout(context)
                     val inputType = when (pClass) {
-                        Int::class.java, Int::class.javaPrimitiveType!! -> android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_SIGNED
-                        Long::class.java, Long::class.javaPrimitiveType!! -> android.text.InputType.TYPE_CLASS_NUMBER
-                        else -> android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                        Int::class.java, Int::class.javaPrimitiveType!! -> InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED
+                        Long::class.java, Long::class.javaPrimitiveType!! -> InputType.TYPE_CLASS_NUMBER
+                        else -> InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
                     }
-                    val hint = when (pClass) {
+                    val def = when (pClass) {
                         Int::class.java, Int::class.javaPrimitiveType!! -> "0"
                         Long::class.java, Long::class.javaPrimitiveType!! -> "0"
                         else -> "0.0"
                     }
-                    val numInput = createTextInput(context, hint = hint, inputType = inputType) { updatePreview() }
+                    val numInput = createTextInput(context, default = def, inputType = inputType) { updatePreview() }
                     til.addView(numInput)
                     inputViews.add(numInput)
                     layout.addView(til)
@@ -257,9 +260,19 @@ object Dialogs {
         layout.setPadding(24.dpToPx(), 12.dpToPx(), 24.dpToPx(), 0)
         updatePreview()
 
+        // Wrap the parameter layout in a NestedScrollView so long dialogs can scroll.
+        val maxHeightPx = (context.resources.displayMetrics.heightPixels * 0.6f).toInt()
+        val scroll = NestedScrollView(context).apply {
+            isFillViewport = true
+            // add the vertical layout as the child
+            addView(layout, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            // constrain the scroll container height so the dialog won't exceed the screen
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxHeightPx)
+        }
+
         MaterialAlertDialogBuilder(context)
             .setTitle(context.getString(R.string.invoke_title, method.name))
-            .setView(layout)
+            .setView(scroll)
             .setPositiveButton(context.getString(R.string.invoke), null)
             .setNegativeButton(context.getString(R.string.cancel), null)
             .create()
