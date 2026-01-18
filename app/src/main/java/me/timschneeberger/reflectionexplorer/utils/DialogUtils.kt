@@ -2,7 +2,6 @@ package me.timschneeberger.reflectionexplorer.utils
 
 import android.content.Context
 import android.view.View
-import android.annotation.SuppressLint
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
@@ -82,10 +81,9 @@ object Dialogs {
         anchor: View?,
         callback: (Boolean, Any?, String?) -> Unit
     ) {
-        showSimpleInputDialog(context, title, hint, initialText) { text ->
-            parseValueWithSnackbar(context, anchor, text, type, genericType, elementClass)
-                .onSuccess { parsed -> callback(true, parsed, null) }
-                .onFailure { e -> callback(false, null, e.message) }
+        // Use the richer single-parameter dialog so callers get consistent input widgets
+        showParameterInputDialog(context, title, type, genericType, elementClass, initialText, anchor) { ok, value, err ->
+            callback(ok, value, err)
         }
     }
 
@@ -97,8 +95,19 @@ object Dialogs {
         callback: (Boolean, String?) -> Unit
     ) {
         val field = fieldInfo.field
-        showSimpleInputDialog(context, context.getString(R.string.set_field_title, field.name), context.getString(R.string.set_field_hint, field.name, field.type.simpleName), "") { text ->
-            setFieldFromText(context, anchor, instance, field, text)
+        // Use the richer parameter-style dialog for single-field edits so users can use checkboxes/enums/etc.
+        showParameterInputDialog(
+            context = context,
+            title = context.getString(R.string.set_field_title, field.name),
+            paramType = field.type,
+            genericType = field.genericType,
+            elementClass = null,
+            initialText = "",
+            anchor = anchor
+        ) { ok, value, err ->
+            if (!ok) { callback(false, err); return@showParameterInputDialog }
+            // apply via reflection and show snackbar on failure
+            runWithErrorSnackbar(context, anchor) { instance.setField(field, value) }
                 .onSuccess { callback(true, null) }
                 .onFailure { e -> callback(false, e.message) }
         }
@@ -123,6 +132,7 @@ object Dialogs {
         val inputViews = mutableListOf<View>()
         val chosenElementClasses = MutableList<Class<*>?>(params.size) { null }
         val preview = TextView(context).apply { text = context.getString(R.string.preview_label, "[]") }
+        val paramNames = ParamNames.lookup(method)
 
         fun updatePreview() {
             val parsed = params.mapIndexed { i, pClasspath ->
@@ -148,8 +158,9 @@ object Dialogs {
         )
 
         // Build parameter input views using a helper to avoid duplicated logic
-        fun addParamInput(i: Int, pClass: Class<*>) {
-            layout.addView(TextView(context).apply { text = "param${i}: ${pClass.simpleName}" })
+        fun addParamInput(i: Int, pClass: Class<*>, paramName: String?) {
+            val label = paramName?.takeIf { it.isNotBlank() } ?: "param$i"
+            layout.addView(TextView(context).apply { text = "$label: ${pClass.simpleName}" })
 
             // enum -> dropdown
             if (pClass.isEnum) {
@@ -163,7 +174,7 @@ object Dialogs {
                 til.addView(auto)
                 inputViews.add(auto)
                 layout.addView(til)
-                return
+                // do not return; let listener attachment happen below
             }
 
             // determine if we need an element type selector for arrays/collections/maps
@@ -187,6 +198,7 @@ object Dialogs {
 
             if (needsElementSelector) {
                 val til = TextInputLayout(context)
+                val typeOptions = listOf("String", "Int", "Long", "Double", "Boolean", "Custom...")
                 val auto = MaterialAutoCompleteTextView(context).apply {
                     setAdapter(ArrayAdapter(context, android.R.layout.simple_list_item_1, typeOptions))
                     setOnItemClickListener { _, _, position, _ ->
@@ -215,7 +227,7 @@ object Dialogs {
                 til.addView(auto)
                 layout.addView(til)
                 inputViews.add(auto)
-                return
+                // do not return; attach listeners below
             }
 
             // Now handle simple types
@@ -256,9 +268,22 @@ object Dialogs {
                     layout.addView(til)
                 }
             }
+
+            // attach listeners for preview only (initialText not applicable for method parameters)
+            inputViews.lastOrNull()?.let { v ->
+                when (v) {
+                    is MaterialAutoCompleteTextView -> v.setOnItemClickListener { _, _, _, _ -> updatePreview() }
+                    is TextInputEditText -> v.addTextChangedListener(object : TextWatcher {
+                        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { updatePreview() }
+                        override fun afterTextChanged(s: Editable?) {}
+                    })
+                    is MaterialCheckBox -> v.setOnCheckedChangeListener { _, _ -> updatePreview() }
+                }
+            }
         }
 
-        params.forEachIndexed { i, pClass -> addParamInput(i, pClass) }
+        params.forEachIndexed { i, pClass -> addParamInput(i, pClass, paramNames?.getOrNull(i)) }
 
         layout.addView(preview)
         layout.setPadding(24.dpToPx(), 12.dpToPx(), 24.dpToPx(), 0)
@@ -323,5 +348,166 @@ object Dialogs {
         val res = runCatching { block() }
         res.onFailure { e -> anchor?.let { Snackbar.make(it, context.getString(R.string.error_prefix, e.message ?: ""), Snackbar.LENGTH_SHORT).show() } }
         return res
+    }
+
+    // Parsing helpers are centralized in ReflectionParser
+
+    /**
+     * Show an input dialog for a single parameter-like type (checkbox for booleans, enum dropdown, typed input for primitives,
+     * element-type selector for collections/arrays/maps). Returns parsed value via callback.
+     */
+    fun showParameterInputDialog(
+        context: Context,
+        title: String,
+        paramType: Class<*>,
+        genericType: Type? = null,
+        elementClass: Class<*>? = null,
+        initialText: String = "",
+        anchor: View?,
+        callback: (Boolean, Any?, String?) -> Unit
+    ) {
+        val layout = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        val inputViews = mutableListOf<View>()
+        val chosenElement = arrayOfNulls<Class<*>>(1)
+        var preview = TextView(context)
+
+        fun updatePreview() {
+            val parsed = runCatching {
+                when (val view = inputViews.firstOrNull()) {
+                    is MaterialCheckBox -> view.isChecked
+                    is TextInputEditText -> ReflectionParser.parseValue(view.text.toString(), paramType, genericType, chosenElement[0])
+                    is MaterialAutoCompleteTextView -> if (paramType.isEnum) ReflectionParser.enumConstantFor(paramType, view.text.toString()) else "<type-selector>"
+                    else -> "<err>"
+                }
+            }.getOrDefault("<err>")
+            preview.text = context.getString(R.string.preview_label, parsed.toString())
+        }
+
+        fun addSingleParamInput(pClass: Class<*>) {
+            layout.addView(TextView(context).apply { text = "param: ${pClass.simpleName}" })
+
+            // Choose exactly one input widget based on type
+            when {
+                pClass.isEnum -> {
+                    val enums = pClass.enumConstants?.map { (it as Enum<*>).name } ?: emptyList()
+                    val til = TextInputLayout(context)
+                    val auto = MaterialAutoCompleteTextView(context).apply {
+                        setAdapter(ArrayAdapter(context, android.R.layout.simple_list_item_1, enums))
+                        threshold = 0
+                    }
+                    til.addView(auto)
+                    layout.addView(til)
+                    inputViews.add(auto)
+                }
+                pClass == java.lang.Boolean.TYPE || pClass == java.lang.Boolean::class.javaObjectType -> {
+                    val cb = MaterialCheckBox(context)
+                    layout.addView(cb)
+                    inputViews.add(cb)
+                }
+                pClass == java.lang.Integer.TYPE || pClass == java.lang.Integer::class.javaObjectType
+                        || pClass == java.lang.Long.TYPE || pClass == java.lang.Long::class.javaObjectType
+                        || pClass == java.lang.Double.TYPE || pClass == java.lang.Double::class.javaObjectType
+                        || pClass == java.lang.Float.TYPE || pClass == java.lang.Float::class.javaObjectType -> {
+                    val til = TextInputLayout(context)
+                    val def = when (pClass) {
+                        java.lang.Double.TYPE, java.lang.Double::class.javaObjectType,
+                        java.lang.Float.TYPE, java.lang.Float::class.javaObjectType -> "0.0"
+                        else -> "0"
+                    }
+                    val type = when (pClass) {
+                        java.lang.Double.TYPE, java.lang.Double::class.javaObjectType,
+                        java.lang.Float.TYPE, java.lang.Float::class.javaObjectType -> InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL or InputType.TYPE_NUMBER_FLAG_SIGNED
+                        else -> InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_SIGNED
+                    }
+                    val numInput = createTextInput(context, default = def, inputType = type)
+                    til.addView(numInput)
+                    layout.addView(til)
+                    inputViews.add(numInput)
+                }
+                else -> {
+                    val til = TextInputLayout(context)
+                    val hintTxt = if (pClass.isArray || java.util.Collection::class.java.isAssignableFrom(pClass) || java.util.Map::class.java.isAssignableFrom(pClass)) context.getString(R.string.use_array_hint) else ""
+                    val txt = createTextInput(context, hint = hintTxt)
+                    til.addView(txt)
+                    layout.addView(til)
+                    inputViews.add(txt)
+                }
+            }
+
+            // attach listeners for preview and initial value
+            inputViews.lastOrNull()?.let { v ->
+                when (v) {
+                    is MaterialAutoCompleteTextView -> {
+                        v.setOnItemClickListener { _, _, _, _ -> updatePreview() }
+                        if (initialText.isNotBlank()) v.setText(initialText, false)
+                    }
+                    is TextInputEditText -> {
+                        v.addTextChangedListener(object : TextWatcher {
+                            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { updatePreview() }
+                            override fun afterTextChanged(s: Editable?) {}
+                        })
+                        if (initialText.isNotBlank()) v.setText(initialText)
+                    }
+                    is MaterialCheckBox -> {
+                        v.setOnCheckedChangeListener { _, _ -> updatePreview() }
+                        if (initialText.equals("true", ignoreCase = true)) v.isChecked = true
+                    }
+                }
+            }
+        }
+
+        addSingleParamInput(paramType)
+        // Ensure there's at least one input view (fallback)
+        if (inputViews.isEmpty()) {
+            val til = TextInputLayout(context)
+            val txt = createTextInput(context, hint = if (paramType.isArray || java.util.Collection::class.java.isAssignableFrom(paramType) || java.util.Map::class.java.isAssignableFrom(paramType)) context.getString(R.string.use_array_hint) else "")
+            til.addView(txt)
+            layout.addView(til)
+            inputViews.add(txt)
+            // attach listener
+            txt.addTextChangedListener(object : TextWatcher {
+                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { updatePreview() }
+                override fun afterTextChanged(s: Editable?) {}
+            })
+        }
+        // preview and initial update
+        preview = TextView(context).apply { text = context.getString(R.string.preview_label, "[]") }
+        // initial preview update
+        updatePreview()
+        layout.addView(preview)
+        layout.setPadding(24.dpToPx(), 12.dpToPx(), 24.dpToPx(), 0)
+
+        val maxHeightPx = (context.resources.displayMetrics.heightPixels * 0.6f).toInt()
+        val scroll = NestedScrollView(context).apply {
+            isFillViewport = true
+            addView(layout, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxHeightPx)
+        }
+
+        MaterialAlertDialogBuilder(context)
+            .setTitle(title)
+            .setView(scroll)
+            .setPositiveButton(context.getString(R.string.ok), null)
+            .setNegativeButton(context.getString(R.string.cancel), null)
+            .create()
+            .apply {
+                show()
+                getButton(AlertDialog.BUTTON_POSITIVE)?.setOnClickListener {
+                    val value: Any? = when (val view = inputViews.firstOrNull()) {
+                        is MaterialCheckBox -> view.isChecked
+                        is TextInputEditText -> ReflectionParser.parseValue(view.text.toString(), paramType, genericType, chosenElement[0])
+                        is MaterialAutoCompleteTextView -> if (paramType.isEnum) ReflectionParser.enumConstantFor(paramType, view.text.toString()) else null
+                        else -> null
+                    }
+                    if (value != null) {
+                        callback(true, value, null)
+                    } else {
+                        callback(false, null, "Could not parse input")
+                    }
+                    dismiss()
+                }
+            }
     }
 }
