@@ -18,11 +18,11 @@ object ReflectionParser {
     private fun parsePrimitiveType(text: String, type: Class<*>): Any? {
         return when (type) {
             String::class.java -> text
-            Int::class.javaObjectType, Int::class.javaPrimitiveType!! -> text.toInt()
-            Long::class.javaObjectType, Long::class.javaPrimitiveType!! -> text.toLong()
+            Int::class.javaObjectType, Int::class.javaPrimitiveType!! -> text.toIntOrNull()
+            Long::class.javaObjectType, Long::class.javaPrimitiveType!! -> text.toLongOrNull()
             Boolean::class.javaObjectType, Boolean::class.javaPrimitiveType!! -> when (text.lowercase()) { "true" -> true; else -> false }
-            Double::class.javaObjectType, Double::class.javaPrimitiveType!! -> text.toDouble()
-            Float::class.javaObjectType, Float::class.javaPrimitiveType!! -> text.toFloat()
+            Double::class.javaObjectType, Double::class.javaPrimitiveType!! -> text.toDoubleOrNull()
+            Float::class.javaObjectType, Float::class.javaPrimitiveType!! -> text.toFloatOrNull()
             else -> null
         }
     }
