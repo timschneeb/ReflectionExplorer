@@ -4,12 +4,14 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import me.timschneeberger.reflectionexplorer.MainActivity
+import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
 import me.timschneeberger.reflectionexplorer.model.InspectorViewModel
 import me.timschneeberger.reflectionexplorer.adapter.BreadcrumbAdapter
@@ -18,6 +20,9 @@ import me.timschneeberger.reflectionexplorer.databinding.FragmentInspectorBindin
 import me.timschneeberger.reflectionexplorer.utils.ClassHeaderInfo
 import me.timschneeberger.reflectionexplorer.utils.CollectionMember
 import me.timschneeberger.reflectionexplorer.utils.Dialogs
+import me.timschneeberger.reflectionexplorer.utils.Dialogs.showEditValueDialog
+import me.timschneeberger.reflectionexplorer.utils.Dialogs.showErrorDialog
+import me.timschneeberger.reflectionexplorer.utils.Dialogs.showMethodInvocationDialog
 import me.timschneeberger.reflectionexplorer.utils.ElementInfo
 import me.timschneeberger.reflectionexplorer.utils.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.MapEntryInfo
@@ -26,6 +31,7 @@ import me.timschneeberger.reflectionexplorer.utils.MemberInfo
 import me.timschneeberger.reflectionexplorer.utils.ReflectionParser
 import me.timschneeberger.reflectionexplorer.utils.appendToArray
 import me.timschneeberger.reflectionexplorer.utils.formatObject
+import me.timschneeberger.reflectionexplorer.utils.getField
 import me.timschneeberger.reflectionexplorer.utils.listMembers
 import java.lang.reflect.Modifier
 
@@ -84,10 +90,19 @@ class InspectorFragment : Fragment() {
         // create and assign adapter to property
         membersAdapter = MembersAdapter(members, inst, argIndex, vm.collapsedClasses) { member ->
             when (member) {
-                is FieldInfo -> activity?.onInspectField(inst, member, binding.detailsText)
-                is MethodInfo -> activity?.onInvokeMethod(inst, member, binding.detailsText)
-                is ElementInfo -> activity?.onInspectElement(member.value, binding.detailsText)
-                is MapEntryInfo -> activity?.onInspectElement(member.value, binding.detailsText)
+                is FieldInfo -> try {
+                    instance.getField(member.field).let { activity?.openInspectorFor(it) }
+                } catch (e: Exception) {
+                    activity?.showErrorDialog(e)
+                }
+                is MethodInfo -> activity?.showMethodInvocationDialog(instance, member.method, binding.root) {
+                    binding.detailsText.apply {
+                        text = getString(R.string.invoked_result, member.method.name, it?.toString() ?: "null")
+                        isVisible = true
+                    }
+                }
+                is ElementInfo -> activity?.openInspectorFor(member.value)
+                is MapEntryInfo -> activity?.openInspectorFor(member.value)
                 is ClassHeaderInfo -> { /* no-op: adapter handles expand/collapse */ }
             }
         }
@@ -136,7 +151,7 @@ class InspectorFragment : Fragment() {
             binding.addElementButton.setOnClickListener {
                 // Show a simple dialog to enter a value and append it
                 activity ?: return@setOnClickListener
-                Dialogs.showEditValueDialog(activity, "Add element", "", collectionType, null, keyType, binding.root) { ok, parsed, _ ->
+                activity.showEditValueDialog("Add element", "", collectionType, null, keyType, binding.root) { ok, parsed, _ ->
                     if (!ok || parsed == null) return@showEditValueDialog
                     when {
                         // Prefer in-place mutation when the concrete list supports it.

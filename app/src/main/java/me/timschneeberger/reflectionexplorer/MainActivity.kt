@@ -1,23 +1,26 @@
 package me.timschneeberger.reflectionexplorer
 
 import android.os.Bundle
+import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.ViewGroup
 import android.widget.TextView
 import android.widget.Toast
-import android.util.Log
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.ViewModelProvider
 import me.timschneeberger.reflectionexplorer.databinding.ActivityMainBinding
 import me.timschneeberger.reflectionexplorer.fragment.InspectorFragment
 import me.timschneeberger.reflectionexplorer.fragment.InstancesFragment
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
-import me.timschneeberger.reflectionexplorer.utils.Dialogs
+import me.timschneeberger.reflectionexplorer.utils.Dialogs.showErrorDialog
+import me.timschneeberger.reflectionexplorer.utils.Dialogs.showMethodInvocationDialog
+import me.timschneeberger.reflectionexplorer.utils.Dialogs.showSetFieldDialog
 import me.timschneeberger.reflectionexplorer.utils.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.MethodInfo
 import me.timschneeberger.reflectionexplorer.utils.getField
@@ -75,7 +78,9 @@ class MainActivity : AppCompatActivity() {
         openInspectorFor(instance)
     }
 
-    private fun openInspectorFor(instance: Any) {
+    fun openInspectorFor(instance: Any?) {
+        if (instance == null) return
+
         // If primitive or simple boxed type, do not open inspector
         if (instance::class.java.isPrimitive ||
             instance is java.lang.String || instance is java.lang.Number ||
@@ -104,26 +109,9 @@ class MainActivity : AppCompatActivity() {
         while (vm.inspectionStack.size > idx + 1) vm.inspectionStack.removeAt(vm.inspectionStack.lastIndex)
     }
 
-    fun onInspectField(instance: Any, fieldInfo: FieldInfo, detailsText: TextView) {
-        val field = fieldInfo.field
-        try {
-            instance.getField(field)?.let { openInspectorFor(it) } ?: run { detailsText.text = getString(R.string.member_value_null) }
-        } catch (e: Exception) {
-            detailsText.text = getString(R.string.error_prefix, e.message ?: e)
-        }
-    }
-
     // Show a dialog to set a field value. callback receives (success, errorMessage?)
     fun showSetFieldDialog(instance: Any, fieldInfo: FieldInfo, callback: (Boolean, String?) -> Unit) {
-        Dialogs.showSetFieldDialog(this, instance, fieldInfo, binding.root, callback)
-    }
-
-    fun onInspectElement(value: Any?, detailsText: TextView) {
-        value?.let { openInspectorFor(it) } ?: run { detailsText.text = getString(R.string.element_is_null) }
-    }
-
-    fun onInvokeMethod(instance: Any, methodInfo: MethodInfo, detailsText: TextView) {
-        Dialogs.showMethodInvocationDialog(this, instance, methodInfo.method, detailsText, binding.root)
+        showSetFieldDialog(instance, fieldInfo, binding.root, callback)
     }
 
     // Replace the inspection stack entry at index `idx` with `newInstance` and refresh current inspector if shown.

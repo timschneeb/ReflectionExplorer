@@ -21,6 +21,7 @@ import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberHeaderBinding
 import me.timschneeberger.reflectionexplorer.utils.Dialogs
+import me.timschneeberger.reflectionexplorer.utils.Dialogs.showEditValueDialog
 import me.timschneeberger.reflectionexplorer.utils.ReflectionParser
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
 import me.timschneeberger.reflectionexplorer.utils.formatObject
@@ -160,8 +161,8 @@ class MembersAdapter(
                     Snackbar.make(anchor, "Cannot determine element type to edit", Snackbar.LENGTH_SHORT).show()
                     return
                 }
-                Dialogs.showEditValueDialog(
-                    activity, activity.getString(R.string.action_set_value),
+                activity.showEditValueDialog(
+                    activity.getString(R.string.action_set_value),
                     value, type, null, null, anchor
                 ) { ok, parsed, _ ->
                     if (!ok || parsed == null) return@showEditValueDialog
