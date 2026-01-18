@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -119,16 +118,25 @@ class InspectorFragment : Fragment() {
         }
 
         // Determine collection type for adding new elements; null if not a collection
-        val collectionType = membersRaw
+        val firstCollectionItem = membersRaw
             .firstOrNull { it is CollectionMember && ReflectionParser.canParseType(it.getType(inst)) }
-            .let { (it as? CollectionMember)?.getType(inst) }
+
+        val collectionType = when {
+            inst is Map<*, *> && firstCollectionItem != null -> (firstCollectionItem as? MapEntryInfo)?.getTypes(inst)?.second
+            firstCollectionItem != null -> (firstCollectionItem as? CollectionMember)?.getType(inst)
+            else -> null
+        }
+        val keyType = when {
+            inst is Map<*, *> && firstCollectionItem != null -> (firstCollectionItem as? MapEntryInfo)?.getTypes(inst)?.first
+            else -> null
+        }
 
         if (collectionType != null) {
             binding.addElementButton.visibility = View.VISIBLE
             binding.addElementButton.setOnClickListener {
                 // Show a simple dialog to enter a value and append it
                 activity ?: return@setOnClickListener
-                Dialogs.showEditValueDialog(activity, "Add element", "Value", "", collectionType, null, null, binding.root) { ok, parsed, _ ->
+                Dialogs.showEditValueDialog(activity, "Add element", "Value", "", collectionType, null, keyType, binding.root) { ok, parsed, _ ->
                     if (!ok || parsed == null) return@showEditValueDialog
                     when {
                         // Prefer in-place mutation when the concrete list supports it.
@@ -160,13 +168,9 @@ class InspectorFragment : Fragment() {
                             activity.replaceStackAt(argIndex, newList)
                         }
                         inst is Map<*, *> -> {
-                            // for maps, create a new map and add generated key
-                            // TODO: allow custom key input; do not forget to handle key type parsing
-                            @Suppress("UNCHECKED_CAST")
-                            val mapView = inst as Map<Any?, Any?>
-                            val newMap = LinkedHashMap(mapView)
-                            val newKey = "key${newMap.size + 1}"
-                            newMap[newKey] = parsed
+                            val result = parsed as Pair<Any?, Any?>
+                            val newMap = LinkedHashMap(inst)
+                            newMap[result.first] = result.second
                             activity.replaceStackAt(argIndex, newMap)
                         }
                         inst.javaClass.isArray -> {

@@ -160,10 +160,15 @@ class MembersAdapter(
                     Snackbar.make(anchor, "Cannot determine element type to edit", Snackbar.LENGTH_SHORT).show()
                     return
                 }
-                Dialogs.showEditValueDialog(activity, activity.getString(R.string.action_set_value), activity.getString(R.string.action_set_value), value, type, null, null, anchor) { ok, parsed, _ ->
+                Dialogs.showEditValueDialog(
+                    activity, activity.getString(R.string.action_set_value),
+                    activity.getString(R.string.action_set_value),
+                    value, type, null, null, anchor
+                ) { ok, parsed, _ ->
                     if (!ok || parsed == null) return@showEditValueDialog
                     val newRoot = item.applyEdit(rootInstance, parsed)
-                    if (newRoot != null) activity.replaceStackAt(stackIndex, newRoot)
+                    if (newRoot != null)
+                        activity.replaceStackAt(stackIndex, newRoot)
                 }
             }
             else -> {

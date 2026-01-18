@@ -69,6 +69,9 @@ class MapEntryInfo(name: String, val key: Any?, val value: Any?) : MemberInfo(na
 
     override fun getType(rootInstance: Any): Class<*> =
         getValue(rootInstance)?.javaClass ?: Any::class.java
+
+    fun getTypes(rootInstance: Any): Pair<Class<*>,Class<*>> =
+        Pair(key?.javaClass ?: Any::class.java, getType(rootInstance))
 }
 
 // Header that groups members declared on a particular class
