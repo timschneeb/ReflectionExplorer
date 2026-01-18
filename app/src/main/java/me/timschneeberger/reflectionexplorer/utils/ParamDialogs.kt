@@ -21,7 +21,6 @@ import java.lang.reflect.Type
 import android.view.ViewGroup
 import androidx.core.widget.NestedScrollView
 
-// TODO: fill previous value into edit dialog
 /**
  * Base class that holds shared helpers for building parameter-input dialogs.
  */

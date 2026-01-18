@@ -35,7 +35,15 @@ object Dialogs {
         callback: (Boolean, String?) -> Unit
     ) {
         val field = fieldInfo.field
-        SingleParamDialogBuilder(context, context.getString(R.string.set_field_title, field.name), field.type, field.genericType, null, "", anchor)
+        SingleParamDialogBuilder(
+            context,
+            context.getString(R.string.set_field_title, field.name),
+            field.type,
+            field.genericType,
+            null,
+            fieldInfo.getValue(instance)?.toString() ?: "",
+            anchor
+        )
             .show { ok, value, err ->
                 if (!ok) { callback(false, err); return@show }
                 runWithErrorSnackbar(context, anchor) { instance.setField(field, value) }
