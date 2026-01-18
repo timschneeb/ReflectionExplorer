@@ -51,26 +51,27 @@ object Dialogs {
         detailsText: TextView,
         anchor: View?
     ) {
+        fun invokeWithSnackbar(args: Array<Any?>?) {
+            // invoke with empty args and show result
+            runWithErrorSnackbar(context, anchor) { instance.invokeMethod(method, args ?: emptyArray()) }
+                .onSuccess { r -> detailsText.text = context.getString(R.string.invoked_result, method.name, r?.toString() ?: "null") }
+                .onFailure { e -> detailsText.text = context.getString(R.string.invoke_error, e.message ?: "") }
+        }
+
         val params = method.parameterTypes
         val generics = method.genericParameterTypes
 
         if (params.isEmpty()) {
-            // invoke with empty args and show result
-            runWithErrorSnackbar(context, anchor) { instance.invokeMethod(method, emptyArray()) }
-                .onSuccess { r -> detailsText.text = context.getString(R.string.invoked_result, method.name, r?.toString() ?: "null") }
-                .onFailure { e -> detailsText.text = context.getString(R.string.invoke_error, e.message ?: "") }
+            invokeWithSnackbar(null)
             return
         }
 
-        val names = ParamNames.lookup(method)
-        MultiParamDialogBuilder(context, context.getString(R.string.invoke_title, method.name), params, generics, names, null, anchor)
-            .show { ok, args, _ ->
-                if (!ok) return@show
-                val arr = args ?: emptyArray()
-                runWithErrorSnackbar(context, anchor) { instance.invokeMethod(method, arr) }
-                    .onSuccess { r -> detailsText.text = context.getString(R.string.invoked_result, method.name, r?.toString() ?: "null") }
-                    .onFailure { e -> detailsText.text = context.getString(R.string.invoke_error, e.message ?: "") }
-            }
+        MultiParamDialogBuilder(
+            context,
+            context.getString(R.string.invoke_title, method.name),
+            params, generics, ParamNames.lookup(method),
+            null, anchor
+        ).show { ok, args, _ -> if (ok) invokeWithSnackbar(args) }
     }
 
     // Helper that runs [block] and shows an error snackbar on failure using [anchor]. Returns the Result so callers can handle success/failure.
