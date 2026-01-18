@@ -4,17 +4,17 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
 import me.timschneeberger.reflectionexplorer.R
-import me.timschneeberger.reflectionexplorer.databinding.ItemInstanceBinding
+import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
 
 class InstancesAdapter(
     private val items: List<Any>,
     private val onClick: (Any) -> Unit
 ) : ExpandableListAdapter<Any>(items, mutableSetOf()) {
 
-    class VH(val binding: ItemInstanceBinding) : RecyclerView.ViewHolder(binding.root)
+    class VH(val binding: ItemMemberBinding) : RecyclerView.ViewHolder(binding.root)
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        return VH(ItemInstanceBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+        return VH(ItemMemberBinding.inflate(LayoutInflater.from(parent.context), parent, false))
     }
 
     override fun isHeader(item: Any): Boolean = false
@@ -27,11 +27,11 @@ class InstancesAdapter(
         item: Any
     ) {
         (holder as VH).binding.apply {
-            applyRoundedBackground(instanceContainer, visibleItems.indexOf(item), forceSingle = true)
+            applyRoundedBackground(memberContainer, visibleItems.indexOf(item), forceSingle = true)
 
-            itemTitle.text = item::class.java.simpleName
-            itemSubtitle.text = item.toString()
-            itemIcon.setImageResource(R.drawable.ic_class)
+            memberTitle.text = item::class.java.simpleName
+            memberSubtitle.text = item.toString()
+            memberIcon.setImageResource(R.drawable.ic_class)
             root.setOnClickListener { onClick(item) }
         }
     }

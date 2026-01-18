@@ -10,12 +10,15 @@ import androidx.recyclerview.widget.RecyclerView
 import me.timschneeberger.reflectionexplorer.InstancesProvider
 import me.timschneeberger.reflectionexplorer.MainActivity
 import me.timschneeberger.reflectionexplorer.adapter.InstancesAdapter
+import me.timschneeberger.reflectionexplorer.utils.MarginItemDecoration
+import me.timschneeberger.reflectionexplorer.utils.dpToPx
 
 class InstancesFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         val testInstances = InstancesProvider.instances.toList() + container!! + inflater
 
         return RecyclerView(requireContext()).apply {
+            addItemDecoration(MarginItemDecoration(8.dpToPx()))
             layoutManager = LinearLayoutManager(requireContext())
             adapter = InstancesAdapter(testInstances) {
                 (activity as? MainActivity)?.handleInstanceSelected(it)

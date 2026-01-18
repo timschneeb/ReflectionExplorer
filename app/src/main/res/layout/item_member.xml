@@ -35,7 +35,7 @@
                 android:layout_height="wrap_content"
                 android:textSize="13sp"
                 android:textStyle="bold"
-                android:maxLines="1"
+                android:maxLines="2"
                 android:ellipsize="end" />
 
             <TextView
@@ -44,7 +44,7 @@
                 android:layout_height="wrap_content"
                 android:textSize="12sp"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:maxLines="2"
+                android:maxLines="4"
                 android:ellipsize="end" />
 
         </LinearLayout>

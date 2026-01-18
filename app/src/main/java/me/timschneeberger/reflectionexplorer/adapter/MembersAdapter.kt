@@ -85,7 +85,7 @@ class MembersAdapter(
                 is FieldInfo -> {
                     memberTitle.text = item.name
                     memberSubtitle.text = try {
-                        rootInstance.getField(item.field)?.formatObject(root.context, item)
+                        rootInstance.getField(item.field).formatObject(root.context, item)
                     } catch (e: Exception) {
                         root.context.getString(R.string.error_prefix, e)
                     }

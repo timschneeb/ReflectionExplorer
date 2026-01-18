@@ -109,7 +109,7 @@ class MainActivity : AppCompatActivity() {
         try {
             instance.getField(field)?.let { openInspectorFor(it) } ?: run { detailsText.text = getString(R.string.member_value_null) }
         } catch (e: Exception) {
-            detailsText.text = getString(R.string.error_prefix, e.message ?: "")
+            detailsText.text = getString(R.string.error_prefix, e.message ?: e)
         }
     }
 
