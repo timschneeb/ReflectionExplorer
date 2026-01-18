@@ -24,6 +24,7 @@ import me.timschneeberger.reflectionexplorer.utils.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.MapEntryInfo
 import me.timschneeberger.reflectionexplorer.utils.MethodInfo
 import me.timschneeberger.reflectionexplorer.utils.MemberInfo
+import me.timschneeberger.reflectionexplorer.utils.ReflectionParser
 import me.timschneeberger.reflectionexplorer.utils.appendToArray
 import me.timschneeberger.reflectionexplorer.utils.formatObject
 import me.timschneeberger.reflectionexplorer.utils.listMembers
@@ -119,7 +120,7 @@ class InspectorFragment : Fragment() {
 
         // Determine collection type for adding new elements; null if not a collection
         val collectionType = membersRaw
-            .firstOrNull { it is CollectionMember && Dialogs.canParseType(it.getType(inst)) }
+            .firstOrNull { it is CollectionMember && ReflectionParser.canParseType(it.getType(inst)) }
             .let { (it as? CollectionMember)?.getType(inst) }
 
         if (collectionType != null) {

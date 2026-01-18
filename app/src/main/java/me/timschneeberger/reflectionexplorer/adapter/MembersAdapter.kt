@@ -21,6 +21,7 @@ import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberHeaderBinding
 import me.timschneeberger.reflectionexplorer.utils.Dialogs
+import me.timschneeberger.reflectionexplorer.utils.ReflectionParser
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
 import me.timschneeberger.reflectionexplorer.utils.formatObject
 import me.timschneeberger.reflectionexplorer.utils.getField
@@ -90,7 +91,7 @@ class MembersAdapter(
                     }
                     memberIcon.setImageDrawable(item.field.getFieldDrawable(root.context))
 
-                    btnSet.isVisible = Dialogs.canParseType(item.field.type)
+                    btnSet.isVisible = ReflectionParser.canParseType(item.field.type)
                     btnSet.setOnClickListener { runWithActivity(root) { act -> act.showSetFieldDialog(rootInstance, item) {
                         ok, _ -> if (ok) act.replaceStackAt(stackIndex, rootInstance)
                     } } }
@@ -111,7 +112,7 @@ class MembersAdapter(
                     memberSubtitle.text = currentValue.formatObject(root.context, item)
 
                     // Determine whether this element is editable
-                    btnSet.isVisible = Dialogs.canParseType(item.getType(rootInstance))
+                    btnSet.isVisible = ReflectionParser.canParseType(item.getType(rootInstance))
                     btnDelete.isVisible = rootInstance is Collection<*> || rootInstance.javaClass.isArray
 
                     btnDelete.setOnClickListener { runWithActivity(root) { act -> performDelete(act, item) } }
@@ -126,7 +127,7 @@ class MembersAdapter(
                     memberIcon.setImageResource(R.drawable.ic_field)
 
                     btnDelete.isVisible = rootInstance is Map<*, *>
-                    btnSet.isVisible = currentValue != null && Dialogs.canParseType(currentValue::class.java)
+                    btnSet.isVisible = currentValue != null && ReflectionParser.canParseType(currentValue::class.java)
 
                     btnDelete.setOnClickListener { runWithActivity(root) { act -> performDelete(act, item) } }
                     btnSet.setOnClickListener { runWithActivity(root) { act -> performEdit(act, item, root) } }
