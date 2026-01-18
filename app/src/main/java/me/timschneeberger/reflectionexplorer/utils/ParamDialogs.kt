@@ -21,26 +21,10 @@ import java.lang.reflect.Type
 import android.view.ViewGroup
 import androidx.core.widget.NestedScrollView
 
-// Local helper for creating text inputs (kept here to avoid depending on Dialogs.createTextInput)
-private fun createParamTextInput(context: Context, hint: String = "", default: String = "", inputType: Int = InputType.TYPE_CLASS_TEXT, onChanged: (() -> Unit)? = null): TextInputEditText {
-    return TextInputEditText(context).apply {
-        this.text = Editable.Factory.getInstance().newEditable(default)
-        this.hint = hint
-        this.inputType = inputType
-        onChanged?.let { callback ->
-            addTextChangedListener(object : TextWatcher {
-                override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { callback() }
-                override fun afterTextChanged(s: Editable?) {}
-            })
-        }
-    }
-}
-
 /**
  * Base class that holds shared helpers for building parameter-input dialogs.
  */
-abstract class BaseParamDialogBuilder(
+abstract class BaseParamDialogBuilder<R>(
     protected val context: Context,
     protected val title: String,
     protected val anchor: View?
@@ -63,21 +47,27 @@ abstract class BaseParamDialogBuilder(
         }
     }
 
-    protected fun parseView(v: View, expected: Class<*>, gen: Type?, chosen: Class<*>?): Any? = runCatching {
-        when (v) {
-            is MaterialCheckBox -> v.isChecked as Any
-            is TextInputEditText -> ReflectionParser.parseValue(v.text.toString(), expected, gen, chosen)
-            is MaterialAutoCompleteTextView -> if (expected.isEnum) ReflectionParser.enumConstantFor(expected, v.text.toString()) else ReflectionParser.parseValue(v.text.toString(), expected, gen, chosen)
-            else -> null
-        }
-    }.getOrNull()
-
+    // Numeric/class helper used by buildInput
     protected fun isNumericClass(c: Class<*>): Boolean = when (c) {
         Int::class.java, Int::class.javaPrimitiveType,
         Long::class.java, Long::class.javaPrimitiveType,
         Double::class.java, Double::class.javaPrimitiveType,
         Float::class.java, Float::class.javaPrimitiveType -> true
         else -> false
+    }
+
+    // Centralized parser for inputs at an index, used by preview and final argument construction
+    protected fun getParsedInputAt(index: Int, expected: Class<*>, gen: Type?, chosen: Class<*>?): Any? {
+        val view = inputs.getOrNull(index) ?: return null
+        return when (view) {
+            is MaterialCheckBox -> view.isChecked
+            is TextInputEditText -> ReflectionParser.parseValue(view.text.toString(), expected, gen, chosen)
+            is MaterialAutoCompleteTextView -> if (expected.isEnum)
+                ReflectionParser.enumConstantFor(expected, view.text.toString())
+            else
+                ReflectionParser.parseValue(view.text.toString(), expected, gen, chosen)
+            else -> null
+        }
     }
 
     /**
@@ -114,7 +104,13 @@ abstract class BaseParamDialogBuilder(
         if (needsSelector) {
             val til = TextInputLayout(context)
             val options = listOf("String", "Int", "Long", "Double", "Boolean", "Custom...")
-            val map = mapOf("String" to String::class.java, "Int" to Int::class.javaObjectType, "Long" to Long::class.javaObjectType, "Double" to Double::class.javaObjectType, "Boolean" to Boolean::class.javaObjectType)
+            val map = mapOf(
+                "String" to String::class.java,
+                "Int" to Int::class.javaObjectType,
+                "Long" to Long::class.javaObjectType,
+                "Double" to Double::class.javaObjectType,
+                "Boolean" to Boolean::class.javaObjectType
+            )
             val auto = MaterialAutoCompleteTextView(context).apply {
                 setAdapter(ArrayAdapter(context, android.R.layout.simple_list_item_1, options))
                 setOnItemClickListener { _, _, pos, _ ->
@@ -122,8 +118,14 @@ abstract class BaseParamDialogBuilder(
                     if (choice == "Custom...") {
                         val inputClass = TextInputEditText(context).apply { setPadding(24.dpToPx(), 12.dpToPx(), 24.dpToPx(), 0) }
                         MaterialAlertDialogBuilder(context).setTitle(context.getString(R.string.enter_element_class)).setView(inputClass)
-                            .setPositiveButton(context.getString(R.string.ok)) { _, _ -> chosenSetter?.invoke(runCatching { Class.forName(inputClass.text.toString().trim()) }.getOrNull() ?: String::class.java); onChanged?.invoke() }
-                            .setNegativeButton(context.getString(R.string.cancel)) { _, _ -> chosenSetter?.invoke(String::class.java); onChanged?.invoke() }
+                            .setPositiveButton(context.getString(R.string.ok)) { _, _ ->
+                                chosenSetter?.invoke(runCatching { Class.forName(inputClass.text.toString().trim()) }.getOrNull() ?: String::class.java)
+                                onChanged?.invoke()
+                            }
+                            .setNegativeButton(context.getString(R.string.cancel)) { _, _ ->
+                                chosenSetter?.invoke(String::class.java)
+                                onChanged?.invoke()
+                            }
                             .show()
                     } else {
                         chosenSetter?.invoke(map[choice])
@@ -156,8 +158,9 @@ abstract class BaseParamDialogBuilder(
                 Long::class.java, Long::class.javaPrimitiveType -> InputType.TYPE_CLASS_NUMBER
                 else -> InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
             }
-            val def = if (pClass == Double::class.java || pClass == Double::class.javaPrimitiveType || pClass == Float::class.java || pClass == Float::class.javaPrimitiveType) "0.0" else "0"
-            val num = createParamTextInput(context, default = if (init.isNotBlank()) init else def, inputType = inputType, onChanged = onChanged)
+            val def = if (pClass == Double::class.java || pClass == Double::class.javaPrimitiveType ||
+                pClass == Float::class.java || pClass == Float::class.javaPrimitiveType) "0.0" else "0"
+            val num = createParamTextInput(context, default = init.ifBlank { def }, inputType = inputType, onChanged = onChanged)
             til.addView(num)
             layout.addView(til)
             inputs.add(num)
@@ -166,7 +169,10 @@ abstract class BaseParamDialogBuilder(
 
         // fallback text input
         val til = TextInputLayout(context)
-        val hintTxt = if (pClass.isArray || java.util.Collection::class.java.isAssignableFrom(pClass) || java.util.Map::class.java.isAssignableFrom(pClass)) context.getString(R.string.use_array_hint) else ""
+        val hintTxt = if (pClass.isArray || java.util.Collection::class.java.isAssignableFrom(pClass) || java.util.Map::class.java.isAssignableFrom(pClass))
+            context.getString(R.string.use_array_hint)
+        else
+            ""
         val txt = createParamTextInput(context, hint = hintTxt, default = init, onChanged = onChanged)
         til.addView(txt)
         layout.addView(til)
@@ -178,12 +184,40 @@ abstract class BaseParamDialogBuilder(
         layout.addView(preview)
         layout.setPadding(24.dpToPx(), 12.dpToPx(), 24.dpToPx(), 0)
         val maxHeightPx = (context.resources.displayMetrics.heightPixels * 0.6f).toInt()
-        val scroll = NestedScrollView(context).apply { isFillViewport = true; addView(layout, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)); layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxHeightPx) }
-        MaterialAlertDialogBuilder(context).setTitle(title).setView(scroll).setPositiveButton(context.getString(positiveLabelRes), null).setNegativeButton(context.getString(R.string.cancel), null).create().also { dialog ->
-            dialog.show()
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { onPositive(dialog) }
+        MaterialAlertDialogBuilder(context)
+            .setTitle(title)
+            .setView(
+                NestedScrollView(context).apply {
+                    isFillViewport = true
+                    addView(layout, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT))
+                    layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, maxHeightPx)
+                }
+            )
+            .setPositiveButton(context.getString(positiveLabelRes), null)
+            .setNegativeButton(context.getString(R.string.cancel), null)
+            .create()
+            .also { dialog ->
+                dialog.show()
+                dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { onPositive(dialog) }
+            }
+    }
+
+    private fun createParamTextInput(context: Context, hint: String = "", default: String = "", inputType: Int = InputType.TYPE_CLASS_TEXT, onChanged: (() -> Unit)? = null): TextInputEditText {
+        return TextInputEditText(context).apply {
+            this.text = Editable.Factory.getInstance().newEditable(default)
+            this.hint = hint
+            this.inputType = inputType
+            onChanged?.let { callback ->
+                addTextChangedListener(object : TextWatcher {
+                    override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+                    override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { callback() }
+                    override fun afterTextChanged(s: Editable?) {}
+                })
+            }
         }
     }
+
+    abstract fun show(callback: (success: Boolean, result: R?, error: String?) -> Unit)
 }
 
 /**
@@ -197,9 +231,9 @@ class SingleParamDialogBuilder(
     private val keyType: Class<*>? = null,
     private val initialText: String = "",
     anchor: View?
-) : BaseParamDialogBuilder(context, title, anchor) {
+) : BaseParamDialogBuilder<Any>(context, title, anchor) {
     // callback(success, parsedValue or Pair(key,value), error)
-    fun show(callback: (Boolean, Any?, String?) -> Unit) {
+    override fun show(callback: (success: Boolean, parsedValue: Any?, error: String?) -> Unit) {
         val chosenKey = arrayOfNulls<Class<*>>(1)
         val chosenVal = arrayOfNulls<Class<*>>(1)
         val chosenSingle = arrayOfNulls<Class<*>>(1)
@@ -207,12 +241,11 @@ class SingleParamDialogBuilder(
         // update preview for single-param dialog
         fun updatePreview() {
             val txt = if (keyType != null) {
-                val k = parseView(inputs.getOrNull(0) ?: return, keyType, null, chosenKey[0])
-                val v = parseView(inputs.getOrNull(1) ?: return, paramType, genericType, chosenVal[0])
+                val k = getParsedInputAt(0, keyType, null, chosenKey[0])
+                val v = getParsedInputAt(1, paramType, genericType, chosenVal[0])
                 listOf(k, v).toString()
             } else {
-                val v = parseView(inputs.firstOrNull() ?: return, paramType, genericType, chosenSingle[0])
-                listOf(v).toString()
+                getParsedInputAt(0, paramType, genericType, chosenSingle[0]).toString()
             }
             preview.text = context.getString(R.string.preview_label, txt)
         }
@@ -220,27 +253,38 @@ class SingleParamDialogBuilder(
         // build UI
         if (keyType != null) {
             addLabel(context.getString(R.string.key_label))
-            buildInput(keyType, "", null, chosenSetter = { chosenKey[0] = it }, onChanged = { updatePreview() })
+            buildInput(keyType, "", null, chosenSetter = { chosenKey[0] = it }, onChanged = ::updatePreview)
             addLabel(context.getString(R.string.enter_value))
-            buildInput(paramType, initialText, genericType, chosenSetter = { chosenVal[0] = it }, onChanged = { updatePreview() })
-            // ensure preview gets initial value
-            updatePreview()
+            buildInput(paramType, initialText, genericType, chosenSetter = { chosenVal[0] = it }, onChanged = ::updatePreview)
         } else {
             addLabel("${context.getString(R.string.enter_value)} (${paramType.simpleName})")
-            buildInput(paramType, initialText, genericType, chosenSetter = { chosenSingle[0] = it }, onChanged = { updatePreview() })
-            updatePreview()
+            buildInput(paramType, initialText, genericType, chosenSetter = { chosenSingle[0] = it }, onChanged = ::updatePreview)
         }
+        updatePreview()
 
-        showDialogWithPreview(onPositive = { dialog ->
-            if (keyType != null && inputs.size >= 2) {
-                val k = parseView(inputs[0], keyType, null, chosenKey[0]) ?: run { anchor?.let { Snackbar.make(it, context.getString(R.string.error_prefix, "Could not parse key"), Snackbar.LENGTH_SHORT).show() }; return@showDialogWithPreview }
-                val v = parseView(inputs[1], paramType, genericType, chosenVal[0]) ?: run { anchor?.let { Snackbar.make(it, context.getString(R.string.error_prefix, "Could not parse value"), Snackbar.LENGTH_SHORT).show() }; return@showDialogWithPreview }
-                callback(true, Pair(k, v), null); dialog.dismiss(); return@showDialogWithPreview
-            }
-            val view = inputs.firstOrNull()
-            val parsed = view?.let { parseView(it, paramType, genericType, chosenSingle[0]) }
-            if (parsed != null) { callback(true, parsed, null); dialog.dismiss() } else { anchor?.let { Snackbar.make(it, context.getString(R.string.error_prefix, "Could not parse input"), Snackbar.LENGTH_SHORT).show() } }
-        }, positiveLabelRes = R.string.ok)
+        showDialogWithPreview(
+            onPositive = { dialog ->
+                if (keyType != null && inputs.size >= 2) {
+                    val k = getParsedInputAt(0, keyType, null, chosenKey[0])
+                        ?: run { anchor?.let { Snackbar.make(it, context.getString(R.string.error_prefix, "Could not parse key"), Snackbar.LENGTH_SHORT).show() }; return@showDialogWithPreview }
+                    val v = getParsedInputAt(1, paramType, genericType, chosenVal[0])
+                        ?: run { anchor?.let { Snackbar.make(it, context.getString(R.string.error_prefix, "Could not parse value"), Snackbar.LENGTH_SHORT).show() }; return@showDialogWithPreview }
+                    callback(true, Pair(k, v), null)
+                    dialog.dismiss()
+                    return@showDialogWithPreview
+                }
+                val parsed = getParsedInputAt(0, paramType, genericType, chosenSingle[0])
+                if (parsed != null) {
+                    callback(true, parsed, null)
+                    dialog.dismiss()
+                } else {
+                    anchor?.let {
+                        Snackbar.make(it, context.getString(R.string.error_prefix, "Could not parse input"), Snackbar.LENGTH_SHORT).show()
+                    }
+                }
+            },
+            positiveLabelRes = R.string.ok
+        )
     }
 }
 
@@ -255,46 +299,41 @@ class MultiParamDialogBuilder(
     private val paramNames: Array<String>? = null,
     private val initialTexts: Array<String?>? = null,
     anchor: View?
-) : BaseParamDialogBuilder(context, title, anchor) {
-    fun show(callback: (Boolean, Array<Any?>?, String?) -> Unit) {
+) : BaseParamDialogBuilder<Array<Any?>>(context, title, anchor) {
+    override fun show(callback: (Boolean, Array<Any?>?, String?) -> Unit) {
         val chosenElementClasses = MutableList<Class<*>?>(paramTypes.size) { null }
 
         fun updatePreview() {
-            val parsed = paramTypes.mapIndexed { i, pClasspath ->
-                runCatching {
-                    when (val view = inputs.getOrNull(i)) {
-                        is MaterialCheckBox -> view.isChecked
-                        is TextInputEditText -> ReflectionParser.parseValue(view.text.toString(), pClasspath, genericTypes?.getOrNull(i), chosenElementClasses.getOrNull(i))
-                        is MaterialAutoCompleteTextView -> if (pClasspath.isEnum) ReflectionParser.enumConstantFor(pClasspath, (view.text?.toString() ?: "")) else "<type-selector>"
-                        else -> "<err>"
-                    }
-                }.getOrNull() ?: "<err>"
+            val previews = paramTypes.mapIndexed { i, pClasspath ->
+                getParsedInputAt(
+                    i,
+                    pClasspath,
+                    genericTypes?.getOrNull(i),
+                    chosenElementClasses.getOrNull(i)
+                )
             }
-            preview.text = context.getString(R.string.preview_label, parsed.toString())
+            preview.text = context.getString(R.string.preview_label, previews.toString())
         }
-
         paramTypes.forEachIndexed { i, pClass ->
             val init = initialTexts?.getOrNull(i) ?: ""
             val label = paramNames?.getOrNull(i) ?: "param$i"
             // show a label for the parameter (name + type)
             addLabel(context.getString(R.string.param_label, label, pClass.simpleName))
-            buildInput(pClass, init, genericTypes?.getOrNull(i), chosenSetter = { chosenElementClasses[i] = it }, onChanged = { updatePreview() })
+            buildInput(pClass, init, genericTypes?.getOrNull(i), chosenSetter = { chosenElementClasses[i] = it }, onChanged = ::updatePreview)
         }
 
         // ensure preview wired
         updatePreview()
 
-        showDialogWithPreview(onPositive = { dialog ->
-            val args = paramTypes.mapIndexed { i, t ->
-                when (val view = inputs.getOrNull(i)) {
-                    is MaterialCheckBox -> view.isChecked as Any
-                    is TextInputEditText -> ReflectionParser.parseValue(view.text.toString(), t, genericTypes?.getOrNull(i), chosenElementClasses.getOrNull(i))
-                    is MaterialAutoCompleteTextView -> if (t.isEnum) ReflectionParser.enumConstantFor(t, view.text.toString()) else ReflectionParser.parseValue(view.text.toString(), t, genericTypes?.getOrNull(i), chosenElementClasses.getOrNull(i))
-                    else -> null
-                }
-            }.toTypedArray()
-            callback(true, args, null)
-            dialog.dismiss()
-        }, positiveLabelRes = R.string.invoke)
+        showDialogWithPreview(
+            onPositive = { dialog ->
+                val args = paramTypes.mapIndexed { i, t ->
+                    getParsedInputAt(i, t, genericTypes?.getOrNull(i), chosenElementClasses.getOrNull(i))
+                }.toTypedArray()
+                callback(true, args, null)
+                dialog.dismiss()
+            },
+            positiveLabelRes = R.string.invoke
+        )
     }
 }
