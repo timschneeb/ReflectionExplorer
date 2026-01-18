@@ -174,7 +174,7 @@ object Dialogs {
                 til.addView(auto)
                 inputViews.add(auto)
                 layout.addView(til)
-                // do not return; let listener attachment happen below
+                return
             }
 
             // determine if we need an element type selector for arrays/collections/maps
@@ -398,6 +398,7 @@ object Dialogs {
                     til.addView(auto)
                     layout.addView(til)
                     inputViews.add(auto)
+                    return
                 }
                 pClass == java.lang.Boolean.TYPE || pClass == java.lang.Boolean::class.javaObjectType -> {
                     val cb = MaterialCheckBox(context)

@@ -20,7 +20,7 @@
     <string name="set_field_title">Set %1$s</string>
     <string name="set_field_hint">New value for %1$s (%2$s)</string>
     <string name="invoke_title">Invoke %1$s</string>
-    <string name="invoked_result">Invoked %1$s -> %2$s</string>
+    <string name="invoked_result">%1$s -> %2$s</string>
     <string name="invoke_error">Error invoking: %1$s</string>
     <string name="preview_label">Preview: %1$s</string>
     <string name="enter_element_class">Enter element class (e.g. java.lang.Integer)</string>
