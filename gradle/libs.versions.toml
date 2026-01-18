@@ -9,6 +9,7 @@ material = "1.14.0-alpha08"
 activity = "1.12.2"
 constraintlayout = "2.2.1"
 recyclerview = "1.4.0"
+dexlib2 = "2.5.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -20,6 +21,7 @@ androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+dexlib2 = { group = "org.smali", name = "dexlib2", version.ref = "dexlib2" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
