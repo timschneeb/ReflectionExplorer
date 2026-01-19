@@ -20,5 +20,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "ReflectionExplorer"
-include(":app")
-include(":app:sample")
+include(":library")
+include(":sample")
