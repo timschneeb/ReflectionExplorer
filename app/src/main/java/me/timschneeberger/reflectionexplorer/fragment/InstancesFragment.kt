@@ -9,22 +9,17 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import me.timschneeberger.reflectionexplorer.MainActivity
 import me.timschneeberger.reflectionexplorer.ReflectionExplorer
-import me.timschneeberger.reflectionexplorer.TestInstancesProvider
 import me.timschneeberger.reflectionexplorer.adapter.InstancesAdapter
 import me.timschneeberger.reflectionexplorer.utils.MarginItemDecoration
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
 
 class InstancesFragment : Fragment() {
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        // TODO: remove test objects
-        val testInstances = TestInstancesProvider.instances.toMutableList() + container!! + inflater
-
-        return RecyclerView(requireContext()).apply {
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
+        RecyclerView(requireContext()).apply {
             addItemDecoration(MarginItemDecoration(8.dpToPx()))
             layoutManager = LinearLayoutManager(requireContext())
-            adapter = InstancesAdapter(ReflectionExplorer.instances.toList() + testInstances) {
+            adapter = InstancesAdapter(ReflectionExplorer.instances.toList()) {
                 (activity as? MainActivity)?.handleInstanceSelected(it)
             }
         }
-    }
 }

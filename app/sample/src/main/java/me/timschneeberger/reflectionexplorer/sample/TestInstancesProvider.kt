@@ -1,4 +1,4 @@
-package me.timschneeberger.reflectionexplorer
+package me.timschneeberger.reflectionexplorer.sample
 
 import java.util.Optional
 

@@ -25,4 +25,4 @@ dexlib2 = { group = "org.smali", name = "dexlib2", version.ref = "dexlib2" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-
+android-library = { id = "com.android.library", version.ref = "agp" }

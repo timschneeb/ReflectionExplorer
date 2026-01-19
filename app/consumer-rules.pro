@@ -1,0 +1,2 @@
+-keep class me.timschneeberger.reflectionexplorer.ReflectionExplorer { *; }
+-keep class me.timschneeberger.reflectionexplorer.ui.** { *; }
