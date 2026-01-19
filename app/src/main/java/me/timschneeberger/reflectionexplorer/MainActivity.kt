@@ -1,7 +1,6 @@
 package me.timschneeberger.reflectionexplorer
 
 import android.os.Bundle
-import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.ViewGroup
@@ -19,6 +18,7 @@ import me.timschneeberger.reflectionexplorer.utils.Dialogs.showSetFieldDialog
 import me.timschneeberger.reflectionexplorer.utils.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.canInspectType
 import me.timschneeberger.reflectionexplorer.utils.replaceReferences
+import me.timschneeberger.reflectionexplorer.utils.listMembers
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -55,20 +55,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         setSupportActionBar(binding.toolbar)
-
-        // Make sure the Up arrow reflects the current back stack on activity recreate
         supportActionBar?.setDisplayHomeAsUpEnabled(supportFragmentManager.backStackEntryCount > 0)
+        updateTitle()
 
         // Keep inspectionStack in sync with fragment backstack and update toolbar/back button and breadcrumbs.
         supportFragmentManager.addOnBackStackChangedListener {
-            val canGoBack = supportFragmentManager.backStackEntryCount > 0
-            supportActionBar?.setDisplayHomeAsUpEnabled(canGoBack)
-
             // If instance was provided by external caller, skip the instance selection when returning
             if(vm.instanceWasProvidedByCaller && supportFragmentManager.backStackEntryCount < 1) {
                 finish()
                 return@addOnBackStackChangedListener
             }
+
+            val canGoBack = supportFragmentManager.backStackEntryCount > 0
+            supportActionBar?.setDisplayHomeAsUpEnabled(canGoBack)
 
             // trim vm stack to match backstack
             val backCount = supportFragmentManager.backStackEntryCount
@@ -79,9 +78,23 @@ class MainActivity : AppCompatActivity() {
 
             // update toolbar menu (refresh action visibility)
             invalidateOptionsMenu()
+
+            // update title to reflect current inspection target
+            updateTitle()
         }
 
         binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
+    }
+
+    private fun updateTitle() {
+        val title = if (vm.inspectionStack.isNotEmpty()) {
+            val top = vm.inspectionStack.last()
+            val count = top.listMembers().size
+            getString(R.string.header_title, top::class.java.simpleName, count)
+        } else {
+            getString(R.string.app_name)
+        }
+        supportActionBar?.title = title
     }
 
     // Called by InstancesFragment when user selects an instance
@@ -103,6 +116,9 @@ class MainActivity : AppCompatActivity() {
                 .commit()
             // menu should update to show inspector actions
             invalidateOptionsMenu()
+
+            // update title to reflect newly opened inspector
+            updateTitle()
         }
     }
 
@@ -126,20 +142,17 @@ class MainActivity : AppCompatActivity() {
         if (idx < 0 || idx >= vm.inspectionStack.size) return
         val oldInstance = vm.inspectionStack[idx]
 
-        // Search all earlier entries in the inspection stack (not only the immediate parent)
-        var replacedAny = false
         for (pIdx in 0 until idx) {
             val parent = vm.inspectionStack[pIdx]
             try {
-                val (changed, replacement) = replaceReferences(parent, oldInstance, newInstance)
-                if (changed) replacedAny = true
+                val (_, replacement) = replaceReferences(parent, oldInstance, newInstance)
                 if (replacement != null) {
                     // replacement is a new root for this parent position; recurse to replace in the stack
-                    replacedAny = true
                     replaceStackAt(pIdx, replacement)
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
                 // ignore best-effort failures
+                e.printStackTrace()
             }
         }
 
@@ -149,6 +162,9 @@ class MainActivity : AppCompatActivity() {
         // Ask the current InspectorFragment (if visible) to refresh its members to reflect the new object. Post to avoid in-layout mutations.
         val frag = supportFragmentManager.findFragmentById(R.id.container) as? InspectorFragment
         frag?.view?.post { frag.refreshMembers() }
+
+        // update title to reflect changed contents
+        updateTitle()
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
