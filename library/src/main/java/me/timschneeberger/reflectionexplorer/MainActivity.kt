@@ -10,7 +10,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.ViewModelProvider
-import me.timschneeberger.reflectionexplorer.databinding.ActivityMainBinding
+import me.timschneeberger.reflectionexplorer.databinding.ActivityReflectionMainBinding
 import me.timschneeberger.reflectionexplorer.fragment.InspectorFragment
 import me.timschneeberger.reflectionexplorer.fragment.InstancesFragment
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
@@ -21,7 +21,7 @@ import me.timschneeberger.reflectionexplorer.utils.replaceReferences
 import me.timschneeberger.reflectionexplorer.utils.listMembers
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var binding: ActivityMainBinding
+    private lateinit var binding: ActivityReflectionMainBinding
     private val vm: MainViewModel by lazy { ViewModelProvider(this)[MainViewModel::class.java] }
 
     companion object {
@@ -32,7 +32,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        binding = ActivityMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
+        binding = ActivityReflectionMainBinding.inflate(layoutInflater).also { setContentView(it.root) }
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.toolbar) { v, windowInsets ->
             val insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
