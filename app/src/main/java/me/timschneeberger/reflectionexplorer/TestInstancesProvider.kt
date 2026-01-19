@@ -25,7 +25,7 @@ class TestData {
     val genericTest = Optional.empty<String>()
 }
 
-object InstancesProvider {
+object TestInstancesProvider {
     val instances: Array<Any> = arrayOf(
         Person("Alice", 30, Address("1 Main St", "Springfield", "12345")),
         Counter(5),
