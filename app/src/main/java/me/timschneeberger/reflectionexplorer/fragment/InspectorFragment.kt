@@ -1,9 +1,17 @@
 package me.timschneeberger.reflectionexplorer.fragment
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
+import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
+import androidx.appcompat.widget.PopupMenu
+import androidx.core.content.getSystemService
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.DefaultLifecycleObserver
@@ -95,12 +103,12 @@ class InspectorFragment : Fragment() {
                 } catch (e: Exception) {
                     activity?.showErrorDialog(e)
                 }
-                is MethodInfo -> activity?.showMethodInvocationDialog(instance, member.method, binding.root) {
+                is MethodInfo -> activity?.showMethodInvocationDialog(instance, member.method, binding.root) { result ->
                     binding.detailsContainer.isVisible = true
-                    binding.detailsText.text = getString(R.string.invoked_result, member.method.name, it?.toString() ?: "null")
+                    binding.detailsText.text = getString(R.string.invoked_result, member.method.name, result?.toString() ?: "null")
                     binding.detailsMenuButton.apply {
-                        isVisible = it.canInspectType()
-                        setOnClickListener(::openNewInspectorActivityFor)
+                        tag = result
+                        setOnClickListener(::openReturnValueMenu)
                     }
                 }
                 is ElementInfo -> activity?.openInspectorFor(member.value)
@@ -215,8 +223,27 @@ class InspectorFragment : Fragment() {
         return binding.root
     }
 
-    private fun openNewInspectorActivityFor(instance: Any?) {
-        // TODO implement menu
+    private fun openReturnValueMenu(view: View) {
+        val value = view.tag
+        val popup = PopupMenu(requireContext(), view)
+        popup.menu.add(R.string.action_copy_string).apply {
+            setOnMenuItemClickListener {
+                requireContext().getSystemService<ClipboardManager>()?.setPrimaryClip(
+                    ClipData.newPlainText("Value", value?.toString() ?: "null")
+                )
+                true
+            }
+        }
+        if (value != null && value.canInspectType()) {
+            popup.menu.add(R.string.action_inspect).apply {
+                setOnMenuItemClickListener {
+                    MainActivity.pendingInspection = value
+                    startActivity(Intent(requireContext(), MainActivity::class.java))
+                    true
+                }
+            }
+        }
+        popup.show()
     }
 
     private fun applyFilters(members: List<MemberInfo>, mainVm: MainViewModel): List<MemberInfo> {

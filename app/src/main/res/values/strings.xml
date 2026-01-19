@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">ReflectionExplorer</string>
+    <string name="app_name">Reflection Explorer</string>
     <string name="collection_size">%1$d items</string>
     <string name="action_reevaluate">Re-evaluate field</string>
     <string name="action_set_value">Set field value</string>
@@ -32,4 +32,6 @@
     <string name="invoke">Invoke</string>
     <string name="filter">Filter</string>
     <string name="action_open_inspector">Open in new inspector</string>
+    <string name="action_copy_string">Copy as string</string>
+    <string name="action_inspect">Inspect</string>
 </resources>

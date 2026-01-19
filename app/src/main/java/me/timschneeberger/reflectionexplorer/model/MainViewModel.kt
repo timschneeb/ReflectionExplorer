@@ -7,6 +7,8 @@ class MainViewModel : ViewModel() {
     // hold object references for the inspection trail across config changes
     val inspectionStack: MutableList<Any> = mutableListOf()
 
+    var instanceWasProvidedByCaller: Boolean = false
+
     enum class TriState { DEFAULT, INCLUDE, EXCLUDE }
 
     data class MemberFilter(

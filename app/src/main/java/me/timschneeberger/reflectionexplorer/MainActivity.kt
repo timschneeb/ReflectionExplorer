@@ -5,31 +5,28 @@ import android.util.Log
 import android.view.Menu
 import android.view.MenuItem
 import android.view.ViewGroup
-import android.widget.TextView
-import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.lifecycle.ViewModelProvider
 import me.timschneeberger.reflectionexplorer.databinding.ActivityMainBinding
 import me.timschneeberger.reflectionexplorer.fragment.InspectorFragment
 import me.timschneeberger.reflectionexplorer.fragment.InstancesFragment
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
-import me.timschneeberger.reflectionexplorer.utils.Dialogs.showErrorDialog
-import me.timschneeberger.reflectionexplorer.utils.Dialogs.showMethodInvocationDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showSetFieldDialog
 import me.timschneeberger.reflectionexplorer.utils.FieldInfo
-import me.timschneeberger.reflectionexplorer.utils.MethodInfo
 import me.timschneeberger.reflectionexplorer.utils.canInspectType
-import me.timschneeberger.reflectionexplorer.utils.getField
 import me.timschneeberger.reflectionexplorer.utils.replaceReferences
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val vm: MainViewModel by lazy { ViewModelProvider(this)[MainViewModel::class.java] }
+
+    companion object {
+        var pendingInspection: Any? = null
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,8 +41,16 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (savedInstanceState == null) {
-            InstancesFragment().also {
-                supportFragmentManager.beginTransaction().replace(R.id.container, it).commit()
+            val pending = pendingInspection
+            if (pending != null) {
+                // An object is waiting to be inspected
+                pendingInspection = null
+                vm.instanceWasProvidedByCaller = true
+                handleInstanceSelected(pending)
+            } else {
+                InstancesFragment().also {
+                    supportFragmentManager.beginTransaction().replace(R.id.container, it).commit()
+                }
             }
         }
 
@@ -58,6 +63,12 @@ class MainActivity : AppCompatActivity() {
         supportFragmentManager.addOnBackStackChangedListener {
             val canGoBack = supportFragmentManager.backStackEntryCount > 0
             supportActionBar?.setDisplayHomeAsUpEnabled(canGoBack)
+
+            // If instance was provided by external caller, skip the instance selection when returning
+            if(vm.instanceWasProvidedByCaller && supportFragmentManager.backStackEntryCount < 1) {
+                finish()
+                return@addOnBackStackChangedListener
+            }
 
             // trim vm stack to match backstack
             val backCount = supportFragmentManager.backStackEntryCount
@@ -86,7 +97,10 @@ class MainActivity : AppCompatActivity() {
         vm.inspectionStack.add(instance)
         val idx = vm.inspectionStack.size - 1
         InspectorFragment.newInstance(idx).also { fragment ->
-            supportFragmentManager.beginTransaction().replace(R.id.container, fragment).addToBackStack(null).commit()
+            supportFragmentManager.beginTransaction()
+                .replace(R.id.container, fragment)
+                .addToBackStack(null)
+                .commit()
             // menu should update to show inspector actions
             invalidateOptionsMenu()
         }
@@ -128,8 +142,6 @@ class MainActivity : AppCompatActivity() {
                 // ignore best-effort failures
             }
         }
-
-        Log.d("ReflectionExplorer", "replaceStackAt(idx=$idx) replacedAny=$replacedAny for oldInstance=${oldInstance.javaClass.name}")
 
         // finally store the new instance in the inspection stack
         vm.inspectionStack[idx] = newInstance

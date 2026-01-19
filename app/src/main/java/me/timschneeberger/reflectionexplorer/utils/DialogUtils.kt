@@ -6,6 +6,7 @@ import android.widget.TextView
 import androidx.core.view.isVisible
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import me.timschneeberger.reflectionexplorer.R
+import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Type
 
@@ -89,6 +90,15 @@ object Dialogs {
     // Helper that runs [block] and shows an error dialog on failure. Returns the Result so callers can handle success/failure.
     private fun <T> Context.runWithErrorDialog(block: () -> T): Result<T> =
         runCatching { block() }.apply {
-            onFailure { e -> showErrorDialog(e) }
+            onFailure { e ->
+                val unwrapped = when (e) {
+                    // Unwrap InvocationTargetException to get the actual cause
+                    is InvocationTargetException -> e.cause ?: e
+                    else -> e
+                }
+                showErrorDialog(unwrapped)
+            }
         }
 }
+
+
