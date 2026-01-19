@@ -8,6 +8,7 @@ class SampleMainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        ReflectionExplorer.instances.clear()
         ReflectionExplorer.instances.addAll(
             TestInstancesProvider.instances +
             this +
