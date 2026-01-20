@@ -16,6 +16,8 @@ import java.util.zip.ZipFile
 object ParamNames {
     private const val TAG = "ParamNames"
 
+    val additionalDexSearchPaths = mutableListOf<String>()
+
     private val cache: ConcurrentHashMap<Method, Array<String>> = ConcurrentHashMap()
 
     /**
@@ -37,7 +39,7 @@ object ParamNames {
      * Locate APK/DEX paths for this process by reading /proc/self/maps.
      */
     private fun locateApkOrDexPaths(): List<String> {
-        val result = mutableSetOf<String>()
+        val result = additionalDexSearchPaths
         try {
             val mapsFile = File("/proc/self/maps")
             if (!mapsFile.exists()) return emptyList()
@@ -58,7 +60,7 @@ object ParamNames {
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to read /proc/self/maps: ${t.message}", t)
         }
-        return result.toList()
+        return result.distinct().toList()
     }
 
     /**
