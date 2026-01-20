@@ -2,39 +2,93 @@ package me.timschneeberger.reflectionexplorer.adapter
 
 import android.view.LayoutInflater
 import android.view.ViewGroup
+import androidx.core.view.isVisible
+import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
+import me.timschneeberger.reflectionexplorer.Instance
 import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
+import me.timschneeberger.reflectionexplorer.databinding.ItemMemberHeaderBinding
+import me.timschneeberger.reflectionexplorer.utils.dpToPx
+
+// sentinel object used to mark header entries (so Instance can still be the single type T)
+private val HEADER_SENTINEL = Any()
+
+// build a list that injects header Instance objects before each group
+private fun itemsWithHeaders(items: List<Instance>): List<Instance> {
+    val out = mutableListOf<Instance>()
+    var lastGroupName: String? = null
+    for (it in items.sortedBy { it.group?.name }) {
+        val g = it.group
+        if (g != null) {
+            if (g.name != lastGroupName) {
+                // insert a header Instance for this group; use HEADER_SENTINEL as the instance marker
+                out.add(Instance(instance = HEADER_SENTINEL, name = g.name, group = g))
+                lastGroupName = g.name
+            }
+        } else {
+            // reset group tracking when encountering ungrouped items
+            lastGroupName = null
+        }
+        out.add(it)
+    }
+    return out
+}
 
 class InstancesAdapter(
-    private val items: List<Any>,
-    private val onClick: (Any) -> Unit
-) : ExpandableListAdapter<Any>(items, mutableSetOf()) {
+    items: List<Instance>,
+    private val collapsedGroups: MutableSet<String>,
+    private val onClick: (Instance) -> Unit
+) : ExpandableListAdapter<Instance>(
+    itemsWithHeaders(items),
+    collapsedGroups
+) {
 
+    // ViewHolders
     class VH(val binding: ItemMemberBinding) : RecyclerView.ViewHolder(binding.root)
+    class HeaderVH(val binding: ItemMemberHeaderBinding) : RecyclerView.ViewHolder(binding.root)
 
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH {
-        return VH(ItemMemberBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+    override fun isHeader(item: Instance): Boolean = item.instance === HEADER_SENTINEL
+    override fun headerKey(item: Instance): String = item.group?.name ?: ""
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
+        return if (viewType == TYPE_HEADER) HeaderVH(ItemMemberHeaderBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+        else VH(ItemMemberBinding.inflate(LayoutInflater.from(parent.context), parent, false))
     }
 
-    override fun isHeader(item: Any): Boolean = false
-    override fun headerKey(item: Any): String = ""
+    override fun bindHeaderVH(holder: RecyclerView.ViewHolder, item: Instance) {
+        val hv = holder as HeaderVH
+        val group = item.group!!
+        val collapsed = collapsedGroups.contains(group.name)
 
-    override fun bindHeaderVH(holder: RecyclerView.ViewHolder, item: Any) {}
+        // Count items under this header in fullItems (stop at next header)
+        val count = fullItems.dropWhile { it !== item }.drop(1).takeWhile { !isHeader(it) }.count()
 
-    override fun bindItemVH(
-        holder: RecyclerView.ViewHolder,
-        item: Any
-    ) {
-        (holder as VH).binding.apply {
-            applyRoundedBackground(memberContainer, visibleItems.indexOf(item), forceSingle = true)
+        hv.binding.apply {
+            headerChevron.rotation = if (collapsed) 90f else -90f
+            headerTitle.text = hv.binding.root.context.getString(R.string.header_title, group.name, count)
+            headerSubtitle.text = group.subtitle ?: ""
+            headerSubtitle.isVisible = headerSubtitle.text.isNotEmpty()
+            headerCard.updateLayoutParams<ViewGroup.MarginLayoutParams> { bottomMargin = if (collapsed) 0.dpToPx() else 7.dpToPx() }
+            root.setOnClickListener {
+                toggleHeaderCollapsed(item)
+                notifyDataSetChanged()
+            }
+        }
+    }
 
-            memberTitle.text = item::class.java.simpleName
-            memberSubtitle.text = item.toString()
+    override fun bindItemVH(holder: RecyclerView.ViewHolder, item: Instance) {
+        val hv = holder as VH
+        val position = visibleItems.indexOf(item)
+
+        // Apply rounded background using base helper
+        applyRoundedBackground(hv.binding.memberContainer, position)
+
+        hv.binding.apply {
+            memberTitle.text = item.name ?: item.instance::class.java.simpleName
+            memberSubtitle.text = item.instance.toString()
             memberIcon.setImageResource(R.drawable.ic_class)
             root.setOnClickListener { onClick(item) }
         }
     }
-
-    override fun getItemCount(): Int = items.size
 }

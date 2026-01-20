@@ -10,9 +10,8 @@ class SampleMainActivity : AppCompatActivity() {
 
         ReflectionExplorer.instances.clear()
         ReflectionExplorer.instances.addAll(
-            TestInstancesProvider.instances +
-            this +
-            this.layoutInflater
+            (TestInstancesProvider.instances + this + layoutInflater)
+                .map { Instance(it) }
         )
         ReflectionExplorer.launchMainActivity(this)
         finish()

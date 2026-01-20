@@ -61,6 +61,7 @@ class MembersAdapter(
             headerChevron.rotation = if (collapsed) 90f else -90f
             headerTitle.text = root.context.getString(R.string.header_title, header.cls.simpleName, count)
             headerSubtitle.text = pkg
+            headerSubtitle.isVisible = headerSubtitle.text.isNotEmpty()
             headerCard.updateLayoutParams<ViewGroup.MarginLayoutParams> { bottomMargin = if (collapsed) 0.dpToPx() else 7.dpToPx() }
             root.setOnClickListener {
                 toggleHeaderCollapsed(item)
