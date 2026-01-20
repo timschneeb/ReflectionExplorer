@@ -2,14 +2,11 @@ package me.timschneeberger.reflectionexplorer.fragment
 
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
-import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.getSystemService
 import androidx.core.view.isVisible
@@ -272,11 +269,11 @@ class InspectorFragment : Fragment() {
             }
         }
 
-        // helper: tri-state matcher for a predicate on modifiers (e.g., isStatic/isFinal)
-        fun triMatches(mods: Int, state: MainViewModel.TriState, predicate: (Int) -> Boolean): Boolean = when (state) {
+        // helper: tri-state matcher for a predicate
+        fun <T> triMatches(value: T, state: MainViewModel.TriState, predicate: (T) -> Boolean): Boolean = when (state) {
             MainViewModel.TriState.DEFAULT -> true
-            MainViewModel.TriState.INCLUDE -> predicate(mods)
-            MainViewModel.TriState.EXCLUDE -> !predicate(mods)
+            MainViewModel.TriState.INCLUDE -> predicate(value)
+            MainViewModel.TriState.EXCLUDE -> !predicate(value)
         }
 
         return members.filter { m ->
@@ -303,6 +300,17 @@ class InspectorFragment : Fragment() {
                     // static/final tri-state checks
                     if (!triMatches(mods, f.isStatic) { Modifier.isStatic(it) }) return@filter false
                     if (!triMatches(mods, f.isFinal) { Modifier.isFinal(it) }) return@filter false
+
+                    // lambda tri-state: only applies to methods
+                    if (m is MethodInfo) {
+                        val isLambdaMethod = try {
+                            m.method.isSynthetic
+                        } catch (_: Exception) {
+                            false
+                        }
+
+                        if (!triMatches(isLambdaMethod, f.isLambda) { it }) return@filter false
+                    }
 
                     true
                 }

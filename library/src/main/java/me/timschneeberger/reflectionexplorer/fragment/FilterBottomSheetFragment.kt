@@ -72,6 +72,7 @@ class FilterBottomSheetFragment : BottomSheetDialogFragment() {
 
                 modStatic.setTri(f.isStatic)
                 modFinal.setTri(f.isFinal)
+                modLambda.setTri(f.isLambda)
             }
         }
 
@@ -87,6 +88,7 @@ class FilterBottomSheetFragment : BottomSheetDialogFragment() {
 
             bindTriState(modStatic, { vm.memberFilter.isStatic }, { vm.memberFilter.isStatic = it })
             bindTriState(modFinal, { vm.memberFilter.isFinal }, { vm.memberFilter.isFinal = it })
+            bindTriState(modLambda, { vm.memberFilter.isLambda }, { vm.memberFilter.isLambda = it })
         }
     }
 }

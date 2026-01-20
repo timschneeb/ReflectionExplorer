@@ -18,6 +18,7 @@ class MainViewModel : ViewModel() {
         var visibilityPackage: Boolean = false, // package-private
         var isStatic: TriState = TriState.DEFAULT,
         var isFinal: TriState = TriState.DEFAULT,
+        var isLambda: TriState = TriState.DEFAULT,
         var kindMethods: Boolean = false,
         var kindFields: Boolean = false
     ) {
@@ -26,6 +27,7 @@ class MainViewModel : ViewModel() {
             if (kindFields || kindMethods) return true
             if (isStatic != TriState.DEFAULT) return true
             if (isFinal != TriState.DEFAULT) return true
+            if (isLambda != TriState.DEFAULT) return true
             return false
         }
     }
