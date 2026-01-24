@@ -45,6 +45,10 @@ class ElementInfo(name: String, val index: Int, val value: Any?) : MemberInfo(na
     override fun getValue(rootInstance: Any): Any? = when {
         rootInstance is List<*> -> rootInstance.getOrNull(index)
         rootInstance::class.java.isArray -> JArray.get(rootInstance, index)
+        rootInstance is Collection<*> -> {
+            // generic Collection fallback: iterate to the index (works for sets, ArraySet, etc.)
+            (rootInstance as Iterable<*>).elementAtOrNull(index)
+        }
         else -> null
     }
 
