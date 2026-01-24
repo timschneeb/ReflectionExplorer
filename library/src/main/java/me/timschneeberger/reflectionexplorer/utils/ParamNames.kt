@@ -1,6 +1,14 @@
 package me.timschneeberger.reflectionexplorer.utils
 
+import android.annotation.SuppressLint
+import android.app.Application
+import android.app.ContextImpl
+import android.app.LoadedApk
+import android.content.Context
+import android.content.ContextWrapper
+import android.util.ArrayMap
 import android.util.Log
+import dalvik.system.BaseDexClassLoader
 import org.jf.dexlib2.Opcodes
 import org.jf.dexlib2.dexbacked.DexBackedDexFile
 import java.io.BufferedInputStream
@@ -23,10 +31,26 @@ object ParamNames {
     /**
      * Returns parameter names for [method] or null if not found.
      */
-    fun lookup(method: Method): Array<String>? {
+    fun lookup(context: Context, method: Method): Array<String>? {
         val arr = cache.computeIfAbsent(method) {
+            val dexPaths = try {
+                locateDexFromContext(context)
+            }
+            catch (t: Throwable) {
+                Log.w(TAG, "locateDexFromContext failed: ${t.message}", t)
+
+                try {
+                    locateDexFromMemoryMap()
+                } catch (t: Throwable) {
+                    Log.w(TAG, "locateDexFromMemoryMap failed: ${t.message}", t)
+                    null
+                }
+            }
+
+            Log.e(TAG, "Using DEX search paths:\n${dexPaths?.joinToString("\n")}")
+
             try {
-                lookupFromDex(method) ?: emptyArray()
+                lookupFromDex(dexPaths, method) ?: emptyArray()
             } catch (t: Throwable) {
                 Log.w(TAG, "lookup failed for ${method.declaringClass.name}.${method.name}: ${t.message}", t)
                 emptyArray()
@@ -35,14 +59,76 @@ object ParamNames {
         return if (arr.isEmpty()) null else arr
     }
 
+
+    @SuppressLint("DiscouragedPrivateApi")
+    fun locateDexFromContext(context: Context): Array<String> {
+        // Contexts may be wrapped, unwrap them to get the ContextImpl instance
+        if(context is ContextWrapper) {
+            val baseContext = context.baseContext
+            if(baseContext != null && baseContext != context) {
+                return locateDexFromContext(baseContext)
+            }
+            throw IllegalStateException("Unable to locate base context from ContextWrapper")
+        }
+
+        if(context !is ContextImpl) {
+            throw IllegalArgumentException("Context is not an instance of ContextImpl: ${context::class.java.name}")
+        }
+
+        // Access mPackageInfo field (LoadedApk)
+        val loadedApk = ContextImpl::class.java.getDeclaredField("mPackageInfo").run {
+            isAccessible = true
+            get(context) as LoadedApk
+        }
+
+        // Access sApplications field (ArrayMap<String, Application>)
+        val apps = LoadedApk::class.java.getDeclaredField("sApplications").run {
+            isAccessible = true
+            @Suppress("UNCHECKED_CAST")
+            get(loadedApk) as ArrayMap<String, Application>
+        }
+
+        return apps.values
+            .map { it.applicationContext.classLoader }
+            .mapNotNull {
+                // Get DexPathList
+                if (it is BaseDexClassLoader) {
+                    BaseDexClassLoader::class.java.getDeclaredField("pathList").run {
+                        isAccessible = true
+                        get(it) // as DexPathList
+                    }
+                } else null
+            }
+            .flatMap {
+                // Collect all DEX paths from dexElements
+                it::class.java.getDeclaredField("dexElements").run {
+                    isAccessible = true
+                    get(it) as Array<*>
+                }.map { element ->
+                    it.javaClass.getDeclaredMethod("getDexPath").run {
+                        isAccessible = true
+                        invoke(element) as String
+                    }
+                }
+            }
+            .let { it + additionalDexSearchPaths }
+            .toTypedArray()
+            .also {
+                if (it.isEmpty()) {
+                    // Throw if no paths found to indicate fallback is needed
+                    throw IllegalStateException("No DEX paths located from context")
+                }
+            }
+    }
+
     /**
      * Locate APK/DEX paths for this process by reading /proc/self/maps.
      */
-    private fun locateApkOrDexPaths(): List<String> {
+    private fun locateDexFromMemoryMap(): Array<String> {
         val result = additionalDexSearchPaths
         try {
             val mapsFile = File("/proc/self/maps")
-            if (!mapsFile.exists()) return emptyList()
+            if (!mapsFile.exists()) return emptyArray()
             val pathRegex = Regex("""(/[^"\s]+?\.(?:apk|dex|jar|odex))""")
             mapsFile.useLines { lines ->
                 lines.forEach { line ->
@@ -60,16 +146,15 @@ object ParamNames {
         } catch (t: Throwable) {
             Log.e(TAG, "Failed to read /proc/self/maps: ${t.message}", t)
         }
-        return result.distinct().toList()
+        return result.distinct().toTypedArray()
     }
 
     /**
      * Read DEX/APK files and extract parameter names using dexlib2.
      */
-    private fun lookupFromDex(method: Method): Array<String>? {
+    private fun lookupFromDex(paths: Array<String>?, method: Method): Array<String>? {
         val cls = method.declaringClass
-        val paths = locateApkOrDexPaths()
-        if (paths.isEmpty()) return null
+        if (paths.isNullOrEmpty()) return null
 
         val klassDescriptor = "L${cls.name.replace('.', '/')};"
         val methodName = method.name

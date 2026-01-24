@@ -74,7 +74,7 @@ object Dialogs {
         MultiParamDialogBuilder(
             this,
             getString(R.string.invoke_title, method.name),
-            params, generics, ParamNames.lookup(method),
+            params, generics, ParamNames.lookup(this, method),
             null, anchor
         ).show { ok, args, _ -> if (ok) invokeWithFeedback(args) }
     }

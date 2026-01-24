@@ -1,5 +1,6 @@
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.refine)
 }
 
 android {
@@ -42,4 +43,7 @@ dependencies {
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+
+    implementation(libs.refine.runtime)
+    compileOnly(project(":library:hidden-api"))
 }

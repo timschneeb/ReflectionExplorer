@@ -26,4 +26,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "ReflectionExplorer"
 include(":library")
+include(":library:hidden-api")
 include(":sample")
