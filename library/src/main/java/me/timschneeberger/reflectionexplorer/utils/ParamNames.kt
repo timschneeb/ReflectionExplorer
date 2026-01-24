@@ -2,7 +2,6 @@ package me.timschneeberger.reflectionexplorer.utils
 
 import android.annotation.SuppressLint
 import android.app.Application
-import android.app.ContextImpl
 import android.app.LoadedApk
 import android.content.Context
 import android.content.ContextWrapper
@@ -17,6 +16,8 @@ import java.io.FileInputStream
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.ZipFile
+import kotlin.text.contains
+import kotlin.text.startsWith
 
 /**
  * Small helper to obtain parameter names from DEX files using dexlib2, with caching.
@@ -45,12 +46,15 @@ object ParamNames {
                     Log.w(TAG, "locateDexFromMemoryMap failed: ${t.message}", t)
                     null
                 }
+            }?.filter {
+                // Skip resource-only APKs
+                !it.contains("/overlay/") &&
+                !it.startsWith("/data/resource-cache/") &&
+                it != "/system/framework/framework-res.apk"
             }
 
-            Log.e(TAG, "Using DEX search paths:\n${dexPaths?.joinToString("\n")}")
-
             try {
-                lookupFromDex(dexPaths, method) ?: emptyArray()
+                lookupFromDex(dexPaths?.toTypedArray(), method) ?: emptyArray()
             } catch (t: Throwable) {
                 Log.w(TAG, "lookup failed for ${method.declaringClass.name}.${method.name}: ${t.message}", t)
                 emptyArray()
@@ -71,12 +75,12 @@ object ParamNames {
             throw IllegalStateException("Unable to locate base context from ContextWrapper")
         }
 
-        if(context !is ContextImpl) {
+        if(context::class.java.name != "android.app.ContextImpl") {
             throw IllegalArgumentException("Context is not an instance of ContextImpl: ${context::class.java.name}")
         }
 
         // Access mPackageInfo field (LoadedApk)
-        val loadedApk = ContextImpl::class.java.getDeclaredField("mPackageInfo").run {
+        val loadedApk = context::class.java.getDeclaredField("mPackageInfo").run {
             isAccessible = true
             get(context) as LoadedApk
         }
@@ -105,7 +109,7 @@ object ParamNames {
                     isAccessible = true
                     get(it) as Array<*>
                 }.map { element ->
-                    it.javaClass.getDeclaredMethod("getDexPath").run {
+                    element!!.javaClass.getDeclaredMethod("getDexPath").run {
                         isAccessible = true
                         invoke(element) as String
                     }
@@ -132,15 +136,7 @@ object ParamNames {
             val pathRegex = Regex("""(/[^"\s]+?\.(?:apk|dex|jar|odex))""")
             mapsFile.useLines { lines ->
                 lines.forEach { line ->
-                    pathRegex.find(line)?.groups?.get(1)?.value?.let {
-                        // Skip resource-only APKs
-                        if (!it.contains("/overlay/") &&
-                            !it.startsWith("/data/resource-cache/") &&
-                            it != "/system/framework/framework-res.apk" &&
-                            // Skip apex packages for now
-                            !it.startsWith("/apex/"))
-                            result.add(it)
-                    }
+                    pathRegex.find(line)?.groups?.get(1)?.value?.let(result::add)
                 }
             }
         } catch (t: Throwable) {
@@ -213,13 +209,23 @@ object ParamNames {
     }
 
     private fun parseDexStreamForMethod(input: java.io.InputStream, klassDescriptor: String, methodName: String, paramCount: Int): Array<String>? {
+        var methodSignatureFound = false
         try {
             val dex = DexBackedDexFile.fromInputStream(Opcodes.getDefault(), input)
             for (dexClass in dex.classes) {
                 if (dexClass.type != klassDescriptor) continue
+                if (methodSignatureFound) {
+                    // Already found method in a previous class, though no parameter names were available.
+                    // We only break after scanning all methods in the previous class to ensure no other overloads exist.
+                    break
+                }
+
                 for (dm in dexClass.methods) {
                     if (dm.name != methodName) continue
                     try {
+                        // Found potential method, set flag
+                        methodSignatureFound = true
+
                         val names = dm.parameters.mapNotNull { it.name }
                         if (names.size == paramCount && names.all { it.isNotBlank() }) {
                             return names.toTypedArray()
@@ -232,6 +238,12 @@ object ParamNames {
         } catch (t: Throwable) {
             Log.e(TAG, "dexlib2 parse error: ${t.message}", t)
         }
+
+        // If method signature was found but parameter names are missing/incomplete, generate new names
+        if (methodSignatureFound) {
+            return Array(paramCount) { idx -> "param$idx" }
+        }
+
         return null
     }
 }
