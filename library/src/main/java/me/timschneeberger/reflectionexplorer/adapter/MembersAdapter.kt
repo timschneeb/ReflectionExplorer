@@ -22,6 +22,8 @@ import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberHeaderBinding
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showEditValueDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showSetFieldDialog
+import me.timschneeberger.reflectionexplorer.utils.cast
+import me.timschneeberger.reflectionexplorer.utils.castOrNull
 import me.timschneeberger.reflectionexplorer.utils.reflection.ReflectionParser
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
 import me.timschneeberger.reflectionexplorer.utils.reflection.formatObject
@@ -44,10 +46,10 @@ class MembersAdapter(
     private val originalFullItems: MutableList<MemberInfo> = items.toMutableList()
 
     private fun activityOrNull(anchor: View): MainActivity? =
-        (anchor.context as? MainActivity)
+        anchor.context.castOrNull<MainActivity>()
 
     override fun isHeader(item: MemberInfo): Boolean = item is ClassHeaderInfo
-    override fun headerKey(item: MemberInfo): String = (item as? ClassHeaderInfo)?.cls?.name ?: item.name
+    override fun headerKey(item: MemberInfo): String = item.castOrNull<ClassHeaderInfo>()?.cls?.name ?: item.name
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder =
         if (viewType == TYPE_HEADER) HeaderVH(ItemMemberHeaderBinding.inflate(LayoutInflater.from(parent.context), parent, false))
@@ -176,7 +178,7 @@ class MembersAdapter(
             } else {
                 val matches = when (m) {
                     is ElementInfo -> {
-                        try { (m as CollectionMember).getValue(rootInstance)?.toString() ?: "" } catch (_: Exception) { "" }
+                        try { m.cast<CollectionMember>().getValue(rootInstance)?.toString() ?: "" } catch (_: Exception) { "" }
                             .lowercase()
                             .contains(q)
                     }

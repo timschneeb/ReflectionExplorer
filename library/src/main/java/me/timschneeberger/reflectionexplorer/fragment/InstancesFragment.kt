@@ -14,6 +14,8 @@ import me.timschneeberger.reflectionexplorer.ReflectionExplorer
 import me.timschneeberger.reflectionexplorer.adapter.InstancesAdapter
 import me.timschneeberger.reflectionexplorer.model.InstancesViewModel
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
+import me.timschneeberger.reflectionexplorer.utils.cast
+import me.timschneeberger.reflectionexplorer.utils.castOrNull
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
 
 class InstancesFragment : Fragment() {
@@ -27,7 +29,9 @@ class InstancesFragment : Fragment() {
         val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
 
         instancesAdapter = InstancesAdapter(ReflectionExplorer.instances.toList(), vm.collapsedGroups) {
-            (activity as? MainActivity)?.handleInstanceSelected(it.instance)
+            activity
+                ?.cast<MainActivity>()
+                ?.handleInstanceSelected(it.instance)
         }
 
         // Observe shared search query to filter displayed instances

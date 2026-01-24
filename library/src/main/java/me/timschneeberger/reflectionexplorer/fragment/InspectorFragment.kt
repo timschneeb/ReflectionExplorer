@@ -27,6 +27,8 @@ import me.timschneeberger.reflectionexplorer.utils.reflection.CollectionMember
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showEditValueDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showErrorDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showMethodInvocationDialog
+import me.timschneeberger.reflectionexplorer.utils.cast
+import me.timschneeberger.reflectionexplorer.utils.castOrNull
 import me.timschneeberger.reflectionexplorer.utils.reflection.ElementInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.MapEntryInfo
@@ -56,7 +58,7 @@ class InspectorFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         binding = FragmentInspectorBinding.inflate(inflater, container, false)
 
-        val activity = activity as? MainActivity
+        val activity = activity.castOrNull<MainActivity>()
         val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
 
         // resolve instance from MainViewModel stack; if missing, show empty state
@@ -338,14 +340,16 @@ class InspectorFragment : Fragment() {
     }
 
     fun refreshBreadcrumb() {
-        (activity as? MainActivity)?.getInspectionTrail()?.let { trail ->
-            bcAdapter?.update(trail, trail.size - 1)
-            binding.breadcrumbs.post {
-                val cnt = bcAdapter?.itemCount ?: 0
-                if (cnt > 0)
-                    binding.breadcrumbs.smoothScrollToPosition(cnt - 1)
+        activity
+            ?.cast<MainActivity>()
+            ?.getInspectionTrail()?.let { trail ->
+                bcAdapter?.update(trail, trail.size - 1)
+                binding.breadcrumbs.post {
+                    val cnt = bcAdapter?.itemCount ?: 0
+                    if (cnt > 0)
+                        binding.breadcrumbs.smoothScrollToPosition(cnt - 1)
+                }
             }
-        }
     }
 
     fun refreshMembers() {

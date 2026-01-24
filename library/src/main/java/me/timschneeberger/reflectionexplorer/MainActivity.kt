@@ -16,6 +16,8 @@ import me.timschneeberger.reflectionexplorer.databinding.ActivityReflectionMainB
 import me.timschneeberger.reflectionexplorer.fragment.InspectorFragment
 import me.timschneeberger.reflectionexplorer.fragment.InstancesFragment
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
+import me.timschneeberger.reflectionexplorer.utils.cast
+import me.timschneeberger.reflectionexplorer.utils.castOrNull
 import me.timschneeberger.reflectionexplorer.utils.reflection.canInspectType
 import me.timschneeberger.reflectionexplorer.utils.reflection.replaceReferences
 import me.timschneeberger.reflectionexplorer.utils.reflection.listMembers
@@ -75,7 +77,11 @@ class MainActivity : AppCompatActivity() {
                 vm.inspectionStack.removeAt(vm.inspectionStack.lastIndex)
 
             // Post breadcrumb refresh to avoid modifying FragmentManager while it is executing transactions.
-            binding.root.post { (supportFragmentManager.findFragmentById(R.id.container) as? InspectorFragment)?.refreshBreadcrumb() }
+            supportFragmentManager.findFragmentById(R.id.container)
+                ?.castOrNull<InspectorFragment>()
+                ?.let {
+                    binding.root.post(it::refreshBreadcrumb)
+                }
 
             // Update action bar
             invalidateOptionsMenu()
@@ -154,8 +160,10 @@ class MainActivity : AppCompatActivity() {
         vm.inspectionStack[idx] = newInstance
 
         // Ask the current InspectorFragment (if visible) to refresh its members to reflect the new object. Post to avoid in-layout mutations.
-        val frag = supportFragmentManager.findFragmentById(R.id.container) as? InspectorFragment
-        frag?.view?.post { frag.refreshMembers() }
+        supportFragmentManager
+            .findFragmentById(R.id.container)
+            .castOrNull<InspectorFragment>()
+            ?.run { view?.post(::refreshMembers) }
 
         // update title to reflect changed contents
         updateTitle()
@@ -200,7 +208,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun performRefreshFields() {
         // Notify current InspectorFragment to refresh values (this will re-fetch field values and update adapter)
-        val frag = supportFragmentManager.findFragmentById(R.id.container) as? InspectorFragment
-        frag?.refreshMembers()
+        supportFragmentManager
+            .findFragmentById(R.id.container)
+            .castOrNull<InspectorFragment>()
+            ?.refreshMembers()
     }
 }
