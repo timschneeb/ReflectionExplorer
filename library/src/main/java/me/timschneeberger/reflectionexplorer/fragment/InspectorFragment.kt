@@ -7,6 +7,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.getSystemService
 import androidx.core.view.isVisible
@@ -27,7 +28,6 @@ import me.timschneeberger.reflectionexplorer.utils.reflection.CollectionMember
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showEditValueDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showErrorDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showMethodInvocationDialog
-import me.timschneeberger.reflectionexplorer.utils.cast
 import me.timschneeberger.reflectionexplorer.utils.castOrNull
 import me.timschneeberger.reflectionexplorer.utils.reflection.ElementInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.FieldInfo
@@ -40,6 +40,7 @@ import me.timschneeberger.reflectionexplorer.utils.reflection.canInspectType
 import me.timschneeberger.reflectionexplorer.utils.reflection.formatObject
 import me.timschneeberger.reflectionexplorer.utils.reflection.getField
 import me.timschneeberger.reflectionexplorer.utils.reflection.listMembers
+import me.timschneeberger.reflectionexplorer.utils.reflection.replaceReferences
 import java.lang.reflect.Modifier
 
 class InspectorFragment : Fragment() {
@@ -64,14 +65,17 @@ class InspectorFragment : Fragment() {
         // resolve instance from MainViewModel stack; if missing, show empty state
         val instance = mainVm.inspectionStack.getOrNull(argIndex)
 
-        val trail = activity?.getInspectionTrail() ?: listOf(instance?.javaClass?.simpleName ?: "root")
+        // Compute breadcrumb trail from the shared MainViewModel instead of calling into MainActivity
+        val trail = getInspectionTrailFromVm(mainVm, instance)
 
         bcAdapter = BreadcrumbAdapter(trail, trail.size - 1) { idx ->
-            activity?.getInspectionTrail()?.let { live ->
+            // update UI immediately with live trail
+            getInspectionTrailFromVm(mainVm, instance).let { live ->
                 bcAdapter?.update(live, idx)
                 binding.breadcrumbs.post { if ((bcAdapter?.itemCount ?: 0) > idx) binding.breadcrumbs.smoothScrollToPosition(idx) }
             }
-            activity?.popToLevel(idx)
+            // perform navigation to the requested level
+            popToLevel(idx)
         }
 
         binding.breadcrumbs.apply {
@@ -95,7 +99,13 @@ class InspectorFragment : Fragment() {
         val vm = ViewModelProvider(requireActivity())[InspectorViewModel::class.java]
 
         // create and assign adapter to property
-        membersAdapter = MembersAdapter(members, inst, argIndex, vm.collapsedClasses) { member ->
+        membersAdapter = MembersAdapter(
+            members,
+            inst,
+            argIndex,
+            vm.collapsedClasses,
+            { idx, obj -> replaceStackAt(idx, obj) }
+        ) { member ->
             when (member) {
                 is FieldInfo -> try {
                     instance.getField(member.field).let { activity?.openInspectorFor(it) }
@@ -189,28 +199,28 @@ class InspectorFragment : Fragment() {
 
                             if (added) {
                                 // mutated in-place
-                                activity.replaceStackAt(argIndex, inst)
+                                replaceStackAt(argIndex, inst)
                             } else {
                                 // underlying list is fixed-size (e.g., Arrays.asList); create a new mutable copy
                                 val newList = ArrayList(ml)
                                 newList.add(parsed)
-                                activity.replaceStackAt(argIndex, newList)
+                                replaceStackAt(argIndex, newList)
                             }
                         }
                         inst is List<*> -> {
                             // Non-mutable List: create mutable copy and replace
                             val newList = ArrayList(inst)
                             newList.add(parsed)
-                            activity.replaceStackAt(argIndex, newList)
+                            replaceStackAt(argIndex, newList)
                         }
                         inst is Map<*, *> -> {
                             val result = parsed as Pair<Any?, Any?>
                             val newMap = LinkedHashMap(inst)
                             newMap[result.first] = result.second
-                            activity.replaceStackAt(argIndex, newMap)
+                            replaceStackAt(argIndex, newMap)
                         }
                         inst.javaClass.isArray -> {
-                            activity.replaceStackAt(
+                            replaceStackAt(
                                 argIndex,
                                 appendToArray(inst, parsed)
                             )
@@ -340,16 +350,61 @@ class InspectorFragment : Fragment() {
     }
 
     fun refreshBreadcrumb() {
-        activity
-            ?.cast<MainActivity>()
-            ?.getInspectionTrail()?.let { trail ->
-                bcAdapter?.update(trail, trail.size - 1)
-                binding.breadcrumbs.post {
-                    val cnt = bcAdapter?.itemCount ?: 0
-                    if (cnt > 0)
-                        binding.breadcrumbs.smoothScrollToPosition(cnt - 1)
+        // Use the shared MainViewModel to compute the current trail rather than calling into MainActivity
+        val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
+        val trail = getInspectionTrailFromVm(mainVm, null)
+        bcAdapter?.update(trail, trail.size - 1)
+        binding.breadcrumbs.post {
+            val cnt = bcAdapter?.itemCount ?: 0
+            if (cnt > 0)
+                binding.breadcrumbs.smoothScrollToPosition(cnt - 1)
+        }
+    }
+
+    // Pop fragment backstack and trim the shared inspection stack to the requested level
+    fun popToLevel(idx: Int) {
+        val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
+        if (idx < 0) return
+        if (idx >= mainVm.inspectionStack.size - 1) return
+        val toPop = mainVm.inspectionStack.size - 1 - idx
+        val fm = requireActivity().supportFragmentManager
+        repeat(toPop) { if (fm.backStackEntryCount > 0) fm.popBackStack() }
+        while (mainVm.inspectionStack.size > idx + 1) mainVm.inspectionStack.removeAt(mainVm.inspectionStack.lastIndex)
+    }
+
+    // Replace the inspection stack entry at index `idx` with `newInstance` and refresh current inspector if shown.
+    fun replaceStackAt(idx: Int, newInstance: Any) {
+        val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
+        if (idx < 0 || idx >= mainVm.inspectionStack.size) return
+        val oldInstance = mainVm.inspectionStack[idx]
+
+        for (pIdx in 0 until idx) {
+            val parent = mainVm.inspectionStack[pIdx]
+            try {
+                val (_, replacement) = replaceReferences(parent, oldInstance, newInstance)
+                if (replacement != null) {
+                    // replacement is a new root for this parent position; recurse to replace in the stack
+                    replaceStackAt(pIdx, replacement)
                 }
+            } catch (e: Exception) {
+                // ignore best-effort failures
+                e.printStackTrace()
             }
+        }
+
+        // Finally store the new instance in the inspection stack
+        mainVm.inspectionStack[idx] = newInstance
+
+        // Refresh its members to reflect the new object. Post to avoid in-layout mutations.
+        view?.post(::refreshMembers)
+
+        // Update title to reflect changed contents
+        (activity as? MainActivity)?.updateTitle()
+    }
+
+    private fun getInspectionTrailFromVm(mainVm: MainViewModel, instanceFallback: Any?): List<String> {
+        val trail = mainVm.inspectionStack.map { it::class.java.simpleName }
+        return trail.ifEmpty { listOf(instanceFallback?.javaClass?.simpleName ?: "root") }
     }
 
     fun refreshMembers() {

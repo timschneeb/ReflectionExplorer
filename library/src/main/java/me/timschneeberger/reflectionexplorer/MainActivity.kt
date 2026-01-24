@@ -16,10 +16,8 @@ import me.timschneeberger.reflectionexplorer.databinding.ActivityReflectionMainB
 import me.timschneeberger.reflectionexplorer.fragment.InspectorFragment
 import me.timschneeberger.reflectionexplorer.fragment.InstancesFragment
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
-import me.timschneeberger.reflectionexplorer.utils.cast
 import me.timschneeberger.reflectionexplorer.utils.castOrNull
 import me.timschneeberger.reflectionexplorer.utils.reflection.canInspectType
-import me.timschneeberger.reflectionexplorer.utils.reflection.replaceReferences
 import me.timschneeberger.reflectionexplorer.utils.reflection.listMembers
 
 class MainActivity : AppCompatActivity() {
@@ -91,7 +89,7 @@ class MainActivity : AppCompatActivity() {
         binding.toolbar.setNavigationOnClickListener { onBackPressedDispatcher.onBackPressed() }
     }
 
-    private fun updateTitle() {
+    fun updateTitle() {
         val title = if (vm.inspectionStack.isNotEmpty()) {
             val top = vm.inspectionStack.last()
             val count = top.listMembers().size
@@ -125,48 +123,6 @@ class MainActivity : AppCompatActivity() {
             // update title to reflect newly opened inspector
             updateTitle()
         }
-    }
-
-    fun getInspectionTrail(): List<String> = vm.inspectionStack.map { it::class.java.simpleName }
-
-    fun popToLevel(idx: Int) {
-        if (idx < 0) return
-        if (idx >= vm.inspectionStack.size - 1) return
-        val toPop = vm.inspectionStack.size - 1 - idx
-        repeat(toPop) { if (supportFragmentManager.backStackEntryCount > 0) supportFragmentManager.popBackStack() }
-        while (vm.inspectionStack.size > idx + 1) vm.inspectionStack.removeAt(vm.inspectionStack.lastIndex)
-    }
-
-    // Replace the inspection stack entry at index `idx` with `newInstance` and refresh current inspector if shown.
-    fun replaceStackAt(idx: Int, newInstance: Any) {
-        if (idx < 0 || idx >= vm.inspectionStack.size) return
-        val oldInstance = vm.inspectionStack[idx]
-
-        for (pIdx in 0 until idx) {
-            val parent = vm.inspectionStack[pIdx]
-            try {
-                val (_, replacement) = replaceReferences(parent, oldInstance, newInstance)
-                if (replacement != null) {
-                    // replacement is a new root for this parent position; recurse to replace in the stack
-                    replaceStackAt(pIdx, replacement)
-                }
-            } catch (e: Exception) {
-                // ignore best-effort failures
-                e.printStackTrace()
-            }
-        }
-
-        // finally store the new instance in the inspection stack
-        vm.inspectionStack[idx] = newInstance
-
-        // Ask the current InspectorFragment (if visible) to refresh its members to reflect the new object. Post to avoid in-layout mutations.
-        supportFragmentManager
-            .findFragmentById(R.id.container)
-            .castOrNull<InspectorFragment>()
-            ?.run { view?.post(::refreshMembers) }
-
-        // update title to reflect changed contents
-        updateTitle()
     }
 
     @SuppressLint("PrivateResource")

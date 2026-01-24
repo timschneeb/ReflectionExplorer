@@ -10,6 +10,7 @@ import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
 import me.timschneeberger.reflectionexplorer.MainActivity
+import me.timschneeberger.reflectionexplorer.fragment.InspectorFragment
 import me.timschneeberger.reflectionexplorer.utils.reflection.ClassHeaderInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.ElementInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.FieldInfo
@@ -39,6 +40,7 @@ class MembersAdapter(
     private val stackIndex: Int,
     // external set (from ViewModel) to persist collapsed state across rotations
     private val collapsedClasses: MutableSet<String>,
+    private val onRequestReplaceStackAt: (Int, Any) -> Unit,
     private val onClick: (MemberInfo) -> Unit
 ) : ExpandableListAdapter<MemberInfo>(items, collapsedClasses) {
 
@@ -101,7 +103,7 @@ class MembersAdapter(
                     btnSet.isVisible = ReflectionParser.canParseType(item.field.type)
                     btnSet.setOnClickListener {
                         root.context.showSetFieldDialog(rootInstance, item) {
-                                ok, _ -> if (ok) activityOrNull(root)?.replaceStackAt(stackIndex, rootInstance)
+                                ok, _ -> if (ok) onRequestReplaceStackAt(stackIndex, rootInstance)
                         }
                     }
                 }
@@ -200,13 +202,13 @@ class MembersAdapter(
     private fun performDelete(activity: MainActivity, item: MemberInfo) {
         if (item is CollectionMember) {
             val newRoot = item.applyDelete(rootInstance)
-            if (newRoot != null) activity.replaceStackAt(stackIndex, newRoot)
+            if (newRoot != null) onRequestReplaceStackAt(stackIndex, newRoot)
         }
     }
 
     private fun performEdit(activity: MainActivity, item: MemberInfo) {
         when (item) {
-            is FieldInfo -> activity.showSetFieldDialog(rootInstance, item) { ok, _ -> if (ok) activity.replaceStackAt(stackIndex, rootInstance) }
+            is FieldInfo -> activity.showSetFieldDialog(rootInstance, item) { ok, _ -> if (ok) onRequestReplaceStackAt(stackIndex, rootInstance) }
             is CollectionMember -> {
                 val value = item.getValue(rootInstance)?.toString() ?: ""
                 val type = item.getType(rootInstance)
@@ -221,7 +223,7 @@ class MembersAdapter(
                     if (!ok || parsed == null) return@showEditValueDialog
                     val newRoot = item.applyEdit(rootInstance, parsed)
                     if (newRoot != null)
-                        activity.replaceStackAt(stackIndex, newRoot)
+                        onRequestReplaceStackAt(stackIndex, newRoot)
                 }
             }
             else -> {
