@@ -1,13 +1,7 @@
 package me.timschneeberger.reflectionexplorer.utils
 
-import android.annotation.SuppressLint
-import android.app.Application
-import android.app.LoadedApk
 import android.content.Context
-import android.content.ContextWrapper
-import android.util.ArrayMap
 import android.util.Log
-import dalvik.system.BaseDexClassLoader
 import org.jf.dexlib2.Opcodes
 import org.jf.dexlib2.dexbacked.DexBackedDexFile
 import java.io.BufferedInputStream
@@ -16,8 +10,6 @@ import java.io.FileInputStream
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.ZipFile
-import kotlin.text.contains
-import kotlin.text.startsWith
 
 /**
  * Small helper to obtain parameter names from DEX files using dexlib2, with caching.
@@ -25,28 +17,15 @@ import kotlin.text.startsWith
 object ParamNames {
     private const val TAG = "ParamNames"
 
-    val additionalDexSearchPaths = mutableListOf<String>()
-
     private val cache: ConcurrentHashMap<Method, Array<String>> = ConcurrentHashMap()
+    val additionalDexSearchPaths = mutableListOf<String>()
 
     /**
      * Returns parameter names for [method] or null if not found.
      */
     fun lookup(context: Context, method: Method): Array<String>? {
         val arr = cache.computeIfAbsent(method) {
-            val dexPaths = try {
-                locateDexFromContext(context)
-            }
-            catch (t: Throwable) {
-                Log.w(TAG, "locateDexFromContext failed: ${t.message}", t)
-
-                try {
-                    locateDexFromMemoryMap()
-                } catch (t: Throwable) {
-                    Log.w(TAG, "locateDexFromMemoryMap failed: ${t.message}", t)
-                    null
-                }
-            }?.filter {
+            val dexPaths = DexLocator.findLoadedPaths(context, additionalDexSearchPaths)?.filter {
                 // Skip resource-only APKs
                 !it.contains("/overlay/") &&
                 !it.startsWith("/data/resource-cache/") &&
@@ -63,88 +42,6 @@ object ParamNames {
         return if (arr.isEmpty()) null else arr
     }
 
-
-    @SuppressLint("DiscouragedPrivateApi")
-    fun locateDexFromContext(context: Context): Array<String> {
-        // Contexts may be wrapped, unwrap them to get the ContextImpl instance
-        if(context is ContextWrapper) {
-            val baseContext = context.baseContext
-            if(baseContext != null && baseContext != context) {
-                return locateDexFromContext(baseContext)
-            }
-            throw IllegalStateException("Unable to locate base context from ContextWrapper")
-        }
-
-        if(context::class.java.name != "android.app.ContextImpl") {
-            throw IllegalArgumentException("Context is not an instance of ContextImpl: ${context::class.java.name}")
-        }
-
-        // Access mPackageInfo field (LoadedApk)
-        val loadedApk = context::class.java.getDeclaredField("mPackageInfo").run {
-            isAccessible = true
-            get(context) as LoadedApk
-        }
-
-        // Access sApplications field (ArrayMap<String, Application>)
-        val apps = LoadedApk::class.java.getDeclaredField("sApplications").run {
-            isAccessible = true
-            @Suppress("UNCHECKED_CAST")
-            get(loadedApk) as ArrayMap<String, Application>
-        }
-
-        return apps.values
-            .map { it.applicationContext.classLoader }
-            .mapNotNull {
-                // Get DexPathList
-                if (it is BaseDexClassLoader) {
-                    BaseDexClassLoader::class.java.getDeclaredField("pathList").run {
-                        isAccessible = true
-                        get(it) // as DexPathList
-                    }
-                } else null
-            }
-            .flatMap {
-                // Collect all DEX paths from dexElements
-                it::class.java.getDeclaredField("dexElements").run {
-                    isAccessible = true
-                    get(it) as Array<*>
-                }.map { element ->
-                    element!!.javaClass.getDeclaredMethod("getDexPath").run {
-                        isAccessible = true
-                        invoke(element) as String
-                    }
-                }
-            }
-            .let { it + additionalDexSearchPaths }
-            .toTypedArray()
-            .also {
-                if (it.isEmpty()) {
-                    // Throw if no paths found to indicate fallback is needed
-                    throw IllegalStateException("No DEX paths located from context")
-                }
-            }
-    }
-
-    /**
-     * Locate APK/DEX paths for this process by reading /proc/self/maps.
-     */
-    private fun locateDexFromMemoryMap(): Array<String> {
-        val result = additionalDexSearchPaths
-        try {
-            val mapsFile = File("/proc/self/maps")
-            if (!mapsFile.exists()) return emptyArray()
-            val pathRegex = Regex("""(/[^"\s]+?\.(?:apk|dex|jar|odex))""")
-            mapsFile.useLines { lines ->
-                lines.forEach { line ->
-                    pathRegex.find(line)?.groups?.get(1)?.value?.let(result::add)
-                }
-            }
-        } catch (t: Throwable) {
-            Log.e(TAG, "Failed to read /proc/self/maps: ${t.message}", t)
-        }
-        return result.distinct().toTypedArray()
-    }
-
     /**
      * Read DEX/APK files and extract parameter names using dexlib2.
      */
@@ -155,11 +52,6 @@ object ParamNames {
         val klassDescriptor = "L${cls.name.replace('.', '/')};"
         val methodName = method.name
         val paramCount = method.parameterCount
-
-
-        paths.joinToString("\n").let {
-            Log.e(TAG, "Scanning DEX/APK paths:\n$it")
-        }
 
         for (p in paths) {
             val f = File(p)
