@@ -169,8 +169,10 @@ abstract class BaseParamDialogBuilder<R>(
 
         // fallback text input
         val til = TextInputLayout(context)
-        val hintTxt = if (pClass.isArray || java.util.Collection::class.java.isAssignableFrom(pClass) || java.util.Map::class.java.isAssignableFrom(pClass))
+        val hintTxt = if (pClass.isArray || java.util.Collection::class.java.isAssignableFrom(pClass))
             context.getString(R.string.use_array_hint)
+        else if (java.util.Map::class.java.isAssignableFrom(pClass))
+            context.getString(R.string.use_map_hint)
         else
             ""
         val txt = createParamTextInput(context, hint = hintTxt, default = init, onChanged = onChanged)
