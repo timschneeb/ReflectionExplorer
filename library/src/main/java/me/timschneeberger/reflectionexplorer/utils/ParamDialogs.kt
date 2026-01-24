@@ -20,6 +20,7 @@ import java.lang.reflect.Type
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.widget.NestedScrollView
+import me.timschneeberger.reflectionexplorer.utils.reflection.ReflectionParser
 
 /**
  * Base class that holds shared helpers for building parameter-input dialogs.

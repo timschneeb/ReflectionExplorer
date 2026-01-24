@@ -16,11 +16,9 @@ import me.timschneeberger.reflectionexplorer.databinding.ActivityReflectionMainB
 import me.timschneeberger.reflectionexplorer.fragment.InspectorFragment
 import me.timschneeberger.reflectionexplorer.fragment.InstancesFragment
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
-import me.timschneeberger.reflectionexplorer.utils.Dialogs.showSetFieldDialog
-import me.timschneeberger.reflectionexplorer.utils.FieldInfo
-import me.timschneeberger.reflectionexplorer.utils.canInspectType
-import me.timschneeberger.reflectionexplorer.utils.replaceReferences
-import me.timschneeberger.reflectionexplorer.utils.listMembers
+import me.timschneeberger.reflectionexplorer.utils.reflection.canInspectType
+import me.timschneeberger.reflectionexplorer.utils.reflection.replaceReferences
+import me.timschneeberger.reflectionexplorer.utils.reflection.listMembers
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityReflectionMainBinding

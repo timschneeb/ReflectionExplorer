@@ -1,4 +1,4 @@
-package me.timschneeberger.reflectionexplorer.utils
+package me.timschneeberger.reflectionexplorer.utils.reflection
 
 import java.lang.reflect.Array
 

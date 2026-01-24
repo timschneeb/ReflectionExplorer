@@ -1,9 +1,12 @@
-package me.timschneeberger.reflectionexplorer.utils
+package me.timschneeberger.reflectionexplorer.utils.reflection
 
 import android.content.Context
 import me.timschneeberger.reflectionexplorer.R
+import java.lang.Number
 import java.lang.reflect.Field
 import java.lang.reflect.Method
+import java.lang.reflect.Modifier
+import kotlin.collections.get
 import java.lang.reflect.Array as JArray
 
 interface SettableMember : GettableMember {
@@ -84,7 +87,7 @@ class ClassHeaderInfo(val cls: Class<*>) : MemberInfo(cls.simpleName)
 // Determine whether the given instance can be meaningfully inspected (is not a primitive wrapper or String)
 fun Any?.canInspectType(): Boolean =
     !(this != null && this::class.java.isPrimitive ||
-            this is java.lang.String || this is java.lang.Number ||
+            this is java.lang.String || this is Number ||
             this is java.lang.Boolean || this is Character)
 
 fun Any?.formatObject(ctx: Context, additionalTypeInfo: GettableMember?, withType: Boolean = true): String = try {
@@ -125,8 +128,8 @@ fun Any.setField(field: Field, value: Any?) {
         modsField.isAccessible = true
         val origMods = modsField.getInt(field)
         // clear final bit if present
-        if ((origMods and java.lang.reflect.Modifier.FINAL) != 0) {
-            modsField.setInt(field, origMods and java.lang.reflect.Modifier.FINAL.inv())
+        if ((origMods and Modifier.FINAL) != 0) {
+            modsField.setInt(field, origMods and Modifier.FINAL.inv())
             try { field.set(this, value) } catch (_: Exception) {}
             // restore
             modsField.setInt(field, origMods)

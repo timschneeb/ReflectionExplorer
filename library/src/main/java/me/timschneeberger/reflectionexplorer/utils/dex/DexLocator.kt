@@ -1,4 +1,4 @@
-package me.timschneeberger.reflectionexplorer.utils
+package me.timschneeberger.reflectionexplorer.utils.dex
 
 import android.annotation.SuppressLint
 import android.app.Application

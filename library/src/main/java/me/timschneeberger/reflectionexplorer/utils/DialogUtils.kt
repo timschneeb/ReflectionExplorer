@@ -1,11 +1,12 @@
 package me.timschneeberger.reflectionexplorer.utils
 
 import android.content.Context
-import android.view.View
-import android.widget.TextView
-import androidx.core.view.isVisible
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import me.timschneeberger.reflectionexplorer.R
+import me.timschneeberger.reflectionexplorer.utils.dex.ParamNames
+import me.timschneeberger.reflectionexplorer.utils.reflection.FieldInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.invokeMethod
+import me.timschneeberger.reflectionexplorer.utils.reflection.setField
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Type

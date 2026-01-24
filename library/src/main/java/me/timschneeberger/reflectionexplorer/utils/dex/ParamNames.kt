@@ -1,4 +1,4 @@
-package me.timschneeberger.reflectionexplorer.utils
+package me.timschneeberger.reflectionexplorer.utils.dex
 
 import android.content.Context
 import android.util.Log
@@ -7,6 +7,7 @@ import org.jf.dexlib2.dexbacked.DexBackedDexFile
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
+import java.io.InputStream
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
 import java.util.zip.ZipFile
@@ -100,7 +101,7 @@ object ParamNames {
         }
     }
 
-    private fun parseDexStreamForMethod(input: java.io.InputStream, klassDescriptor: String, methodName: String, paramCount: Int): Array<String>? {
+    private fun parseDexStreamForMethod(input: InputStream, klassDescriptor: String, methodName: String, paramCount: Int): Array<String>? {
         var methodSignatureFound = false
         try {
             val dex = DexBackedDexFile.fromInputStream(Opcodes.getDefault(), input)

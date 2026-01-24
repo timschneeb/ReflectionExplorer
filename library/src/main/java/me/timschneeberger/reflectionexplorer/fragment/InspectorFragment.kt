@@ -22,22 +22,22 @@ import me.timschneeberger.reflectionexplorer.model.InspectorViewModel
 import me.timschneeberger.reflectionexplorer.adapter.BreadcrumbAdapter
 import me.timschneeberger.reflectionexplorer.adapter.MembersAdapter
 import me.timschneeberger.reflectionexplorer.databinding.FragmentInspectorBinding
-import me.timschneeberger.reflectionexplorer.utils.ClassHeaderInfo
-import me.timschneeberger.reflectionexplorer.utils.CollectionMember
+import me.timschneeberger.reflectionexplorer.utils.reflection.ClassHeaderInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.CollectionMember
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showEditValueDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showErrorDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showMethodInvocationDialog
-import me.timschneeberger.reflectionexplorer.utils.ElementInfo
-import me.timschneeberger.reflectionexplorer.utils.FieldInfo
-import me.timschneeberger.reflectionexplorer.utils.MapEntryInfo
-import me.timschneeberger.reflectionexplorer.utils.MethodInfo
-import me.timschneeberger.reflectionexplorer.utils.MemberInfo
-import me.timschneeberger.reflectionexplorer.utils.ReflectionParser
-import me.timschneeberger.reflectionexplorer.utils.appendToArray
-import me.timschneeberger.reflectionexplorer.utils.canInspectType
-import me.timschneeberger.reflectionexplorer.utils.formatObject
-import me.timschneeberger.reflectionexplorer.utils.getField
-import me.timschneeberger.reflectionexplorer.utils.listMembers
+import me.timschneeberger.reflectionexplorer.utils.reflection.ElementInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.FieldInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.MapEntryInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.MethodInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.MemberInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.ReflectionParser
+import me.timschneeberger.reflectionexplorer.utils.reflection.appendToArray
+import me.timschneeberger.reflectionexplorer.utils.reflection.canInspectType
+import me.timschneeberger.reflectionexplorer.utils.reflection.formatObject
+import me.timschneeberger.reflectionexplorer.utils.reflection.getField
+import me.timschneeberger.reflectionexplorer.utils.reflection.listMembers
 import java.lang.reflect.Modifier
 
 class InspectorFragment : Fragment() {

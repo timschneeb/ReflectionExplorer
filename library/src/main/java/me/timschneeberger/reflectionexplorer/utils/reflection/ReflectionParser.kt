@@ -1,9 +1,12 @@
-package me.timschneeberger.reflectionexplorer.utils
+package me.timschneeberger.reflectionexplorer.utils.reflection
 
 import android.util.Log
 import java.lang.reflect.Array as JArray
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
+import java.util.Collection
+import java.util.List
+import java.util.Map
 
 object ReflectionParser {
     fun canParseType(type: Class<*>): Boolean = when (type) {
@@ -92,11 +95,11 @@ object ReflectionParser {
 
             if (type.isEnum) enumConstantFor(type, text)?.let { return it }
             if (type.isArray) return parseArrayValue()
-            if (java.util.List::class.java.isAssignableFrom(type) || java.util.Collection::class.java.isAssignableFrom(
+            if (List::class.java.isAssignableFrom(type) || Collection::class.java.isAssignableFrom(
                     type
                 )
             ) return parseCollectionValue()
-            if (java.util.Map::class.java.isAssignableFrom(type)) return parseMapValue()
+            if (Map::class.java.isAssignableFrom(type)) return parseMapValue()
         }
         catch (e: Exception) {
             Log.e("ReflectionParser", "Failed to parse value '$text' for type ${type.name}: ${e.message}", e)

@@ -1,7 +1,6 @@
 package me.timschneeberger.reflectionexplorer.adapter
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -10,25 +9,23 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
-import com.google.android.material.snackbar.Snackbar
 import me.timschneeberger.reflectionexplorer.MainActivity
-import me.timschneeberger.reflectionexplorer.utils.ClassHeaderInfo
-import me.timschneeberger.reflectionexplorer.utils.ElementInfo
-import me.timschneeberger.reflectionexplorer.utils.FieldInfo
-import me.timschneeberger.reflectionexplorer.utils.MapEntryInfo
-import me.timschneeberger.reflectionexplorer.utils.MemberInfo
-import me.timschneeberger.reflectionexplorer.utils.MethodInfo
-import me.timschneeberger.reflectionexplorer.utils.CollectionMember
+import me.timschneeberger.reflectionexplorer.utils.reflection.ClassHeaderInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.ElementInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.FieldInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.MapEntryInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.MemberInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.MethodInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.CollectionMember
 import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberHeaderBinding
-import me.timschneeberger.reflectionexplorer.utils.Dialogs
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showEditValueDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showSetFieldDialog
-import me.timschneeberger.reflectionexplorer.utils.ReflectionParser
+import me.timschneeberger.reflectionexplorer.utils.reflection.ReflectionParser
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
-import me.timschneeberger.reflectionexplorer.utils.formatObject
-import me.timschneeberger.reflectionexplorer.utils.getField
+import me.timschneeberger.reflectionexplorer.utils.reflection.formatObject
+import me.timschneeberger.reflectionexplorer.utils.reflection.getField
 import me.timschneeberger.reflectionexplorer.utils.getFieldDrawable
 import me.timschneeberger.reflectionexplorer.utils.getMethodDrawable
 
