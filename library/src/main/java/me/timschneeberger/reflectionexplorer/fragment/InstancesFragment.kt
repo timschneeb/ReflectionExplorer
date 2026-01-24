@@ -30,7 +30,12 @@ class InstancesFragment : Fragment() {
             (activity as? MainActivity)?.handleInstanceSelected(it.instance)
         }
 
-        val rv = RecyclerView(requireContext()).apply {
+        // Observe shared search query to filter displayed instances
+        mainVm.searchQueryLive.observe(viewLifecycleOwner) { query ->
+            instancesAdapter?.filter(query)
+        }
+
+        return RecyclerView(requireContext()).apply {
             layoutManager = LinearLayoutManager(requireContext()).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT,
@@ -40,20 +45,11 @@ class InstancesFragment : Fragment() {
                 }
             }
             adapter = instancesAdapter
+        }.also {
+            // Restore scroll after view is laid out
+            it.post { restoreScrollPositionIfAny() }
+            recyclerView = it
         }
-        recyclerView = rv
-
-        // Observe shared search query to filter displayed instances (adapter-level filtering)
-        mainVm.searchQueryLive.observe(viewLifecycleOwner) { query ->
-            instancesAdapter?.filter(query)
-        }
-
-        // Restore scroll after view is laid out
-        rv.post {
-            restoreScrollPositionIfAny()
-        }
-
-        return rv
     }
 
     override fun onPause() {

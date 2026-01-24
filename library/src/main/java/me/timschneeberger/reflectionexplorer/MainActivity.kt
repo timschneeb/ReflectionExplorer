@@ -68,20 +68,19 @@ class MainActivity : AppCompatActivity() {
                 return@addOnBackStackChangedListener
             }
 
-            val canGoBack = supportFragmentManager.backStackEntryCount > 0
-            supportActionBar?.setDisplayHomeAsUpEnabled(canGoBack)
+            supportActionBar?.setDisplayHomeAsUpEnabled(
+                supportFragmentManager.backStackEntryCount > 0
+            )
 
             // trim vm stack to match backstack
-            val backCount = supportFragmentManager.backStackEntryCount
-            while (vm.inspectionStack.size > backCount) vm.inspectionStack.removeAt(vm.inspectionStack.lastIndex)
+            while (vm.inspectionStack.size > supportFragmentManager.backStackEntryCount)
+                vm.inspectionStack.removeAt(vm.inspectionStack.lastIndex)
 
             // Post breadcrumb refresh to avoid modifying FragmentManager while it is executing transactions.
             binding.root.post { (supportFragmentManager.findFragmentById(R.id.container) as? InspectorFragment)?.refreshBreadcrumb() }
 
-            // update toolbar menu (refresh action visibility)
+            // Update action bar
             invalidateOptionsMenu()
-
-            // update title to reflect current inspection target
             updateTitle()
         }
 
@@ -132,11 +131,6 @@ class MainActivity : AppCompatActivity() {
         val toPop = vm.inspectionStack.size - 1 - idx
         repeat(toPop) { if (supportFragmentManager.backStackEntryCount > 0) supportFragmentManager.popBackStack() }
         while (vm.inspectionStack.size > idx + 1) vm.inspectionStack.removeAt(vm.inspectionStack.lastIndex)
-    }
-
-    // Show a dialog to set a field value. callback receives (success, errorMessage?)
-    fun showSetFieldDialog(instance: Any, fieldInfo: FieldInfo, callback: (Boolean, String?) -> Unit) {
-        showSetFieldDialog(instance, fieldInfo, binding.root, callback)
     }
 
     // Replace the inspection stack entry at index `idx` with `newInstance` and refresh current inspector if shown.

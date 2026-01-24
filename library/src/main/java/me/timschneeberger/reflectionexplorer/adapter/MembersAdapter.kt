@@ -5,6 +5,7 @@ import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
@@ -23,6 +24,7 @@ import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberHeaderBinding
 import me.timschneeberger.reflectionexplorer.utils.Dialogs
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showEditValueDialog
+import me.timschneeberger.reflectionexplorer.utils.Dialogs.showSetFieldDialog
 import me.timschneeberger.reflectionexplorer.utils.ReflectionParser
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
 import me.timschneeberger.reflectionexplorer.utils.formatObject
@@ -44,8 +46,8 @@ class MembersAdapter(
     // Keep original list including ClassHeaderInfo entries so we can filter in-adapter
     private val originalFullItems: MutableList<MemberInfo> = items.toMutableList()
 
-    private fun runWithActivity(anchor: View, block: (MainActivity) -> Unit) =
-        (anchor.context as? MainActivity)?.let(block)
+    private fun activityOrNull(anchor: View): MainActivity? =
+        (anchor.context as? MainActivity)
 
     override fun isHeader(item: MemberInfo): Boolean = item is ClassHeaderInfo
     override fun headerKey(item: MemberInfo): String = (item as? ClassHeaderInfo)?.cls?.name ?: item.name
@@ -98,9 +100,11 @@ class MembersAdapter(
                     memberIcon.setImageDrawable(item.field.getFieldDrawable(root.context))
 
                     btnSet.isVisible = ReflectionParser.canParseType(item.field.type)
-                    btnSet.setOnClickListener { runWithActivity(root) { act -> act.showSetFieldDialog(rootInstance, item) {
-                        ok, _ -> if (ok) act.replaceStackAt(stackIndex, rootInstance)
-                    } } }
+                    btnSet.setOnClickListener {
+                        root.context.showSetFieldDialog(rootInstance, item) {
+                                ok, _ -> if (ok) activityOrNull(root)?.replaceStackAt(stackIndex, rootInstance)
+                        }
+                    }
                 }
 
                 is MethodInfo -> {
@@ -121,8 +125,8 @@ class MembersAdapter(
                     btnSet.isVisible = ReflectionParser.canParseType(item.getType(rootInstance))
                     btnDelete.isVisible = rootInstance is Collection<*> || rootInstance.javaClass.isArray
 
-                    btnDelete.setOnClickListener { runWithActivity(root) { act -> performDelete(act, item) } }
-                    btnSet.setOnClickListener { runWithActivity(root) { act -> performEdit(act, item, root) } }
+                    btnDelete.setOnClickListener { performDelete(activityOrNull(root)!!, item) }
+                    btnSet.setOnClickListener { performEdit(activityOrNull(root)!!, item) }
                 }
 
                 is MapEntryInfo -> {
@@ -135,8 +139,8 @@ class MembersAdapter(
                     btnDelete.isVisible = rootInstance is Map<*, *>
                     btnSet.isVisible = currentValue != null && ReflectionParser.canParseType(currentValue::class.java)
 
-                    btnDelete.setOnClickListener { runWithActivity(root) { act -> performDelete(act, item) } }
-                    btnSet.setOnClickListener { runWithActivity(root) { act -> performEdit(act, item, root) } }
+                    btnDelete.setOnClickListener { performDelete(activityOrNull(root)!!, item) }
+                    btnSet.setOnClickListener { performEdit(activityOrNull(root)!!, item) }
                 }
 
                 else -> {
@@ -201,19 +205,19 @@ class MembersAdapter(
         }
     }
 
-    private fun performEdit(activity: MainActivity, item: MemberInfo, anchor: View) {
+    private fun performEdit(activity: MainActivity, item: MemberInfo) {
         when (item) {
             is FieldInfo -> activity.showSetFieldDialog(rootInstance, item) { ok, _ -> if (ok) activity.replaceStackAt(stackIndex, rootInstance) }
             is CollectionMember -> {
                 val value = item.getValue(rootInstance)?.toString() ?: ""
                 val type = item.getType(rootInstance)
                 if (type == Any::class.java) {
-                    Snackbar.make(anchor, "Cannot determine element type to edit", Snackbar.LENGTH_SHORT).show()
+                    Toast.makeText(activity, "Cannot determine element type to edit", Toast.LENGTH_SHORT).show()
                     return
                 }
                 activity.showEditValueDialog(
                     activity.getString(R.string.action_set_value),
-                    value, type, null, null, anchor
+                    value, type, null, null
                 ) { ok, parsed, _ ->
                     if (!ok || parsed == null) return@showEditValueDialog
                     val newRoot = item.applyEdit(rootInstance, parsed)

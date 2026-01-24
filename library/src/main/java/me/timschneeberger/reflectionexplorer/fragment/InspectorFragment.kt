@@ -100,7 +100,7 @@ class InspectorFragment : Fragment() {
                 } catch (e: Exception) {
                     activity?.showErrorDialog(e)
                 }
-                is MethodInfo -> activity?.showMethodInvocationDialog(instance, member.method, binding.root) { result ->
+                is MethodInfo -> activity?.showMethodInvocationDialog(instance, member.method) { result ->
                     binding.detailsContainer.isVisible = true
                     binding.detailsText.text = getString(R.string.invoked_result, member.method.name, result?.toString() ?: "null")
                     binding.detailsMenuButton.apply {
@@ -170,7 +170,7 @@ class InspectorFragment : Fragment() {
             binding.addElementButton.setOnClickListener {
                 // Show a simple dialog to enter a value and append it
                 activity ?: return@setOnClickListener
-                activity.showEditValueDialog("Add element", "", collectionType, null, keyType, binding.root) { ok, parsed, _ ->
+                activity.showEditValueDialog("Add element", "", collectionType, null, keyType) { ok, parsed, _ ->
                     if (!ok || parsed == null) return@showEditValueDialog
                     when {
                         // Prefer in-place mutation when the concrete list supports it.

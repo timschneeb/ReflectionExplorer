@@ -21,17 +21,15 @@ object Dialogs {
         type: Class<*>,
         genericType: Type? = null,
         keyType: Class<*>? = null,
-        anchor: View?,
         callback: (Boolean, Any?, String?) -> Unit
     ) {
         // Delegate to the reusable single-parameter dialog builder
-        SingleParamDialogBuilder(this, title, type, genericType, keyType, initialText, anchor).show(callback)
+        SingleParamDialogBuilder(this, title, type, genericType, keyType, initialText).show(callback)
     }
 
     fun Context.showSetFieldDialog(
         instance: Any,
         fieldInfo: FieldInfo,
-        anchor: View?,
         callback: (Boolean, String?) -> Unit
     ) {
         val field = fieldInfo.field
@@ -41,8 +39,7 @@ object Dialogs {
             field.type,
             field.genericType,
             null,
-            fieldInfo.getValue(instance)?.toString() ?: "",
-            anchor
+            fieldInfo.getValue(instance)?.toString() ?: ""
         )
             .show { ok, value, err ->
                 if (!ok) { callback(false, err); return@show }
@@ -55,7 +52,6 @@ object Dialogs {
     fun Context.showMethodInvocationDialog(
         instance: Any,
         method: Method,
-        anchor: View?,
         onInvoked: (Any?) -> Unit
     ) {
         fun invokeWithFeedback(args: Array<Any?>?) {
@@ -74,8 +70,8 @@ object Dialogs {
         MultiParamDialogBuilder(
             this,
             getString(R.string.invoke_title, method.name),
-            params, generics, ParamNames.lookup(this, method),
-            null, anchor
+            params, generics,
+            ParamNames.lookup(this, method), null,
         ).show { ok, args, _ -> if (ok) invokeWithFeedback(args) }
     }
 

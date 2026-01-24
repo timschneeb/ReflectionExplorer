@@ -10,7 +10,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.snackbar.Snackbar
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
@@ -19,6 +18,7 @@ import me.timschneeberger.reflectionexplorer.R
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 import android.view.ViewGroup
+import android.widget.Toast
 import androidx.core.widget.NestedScrollView
 
 /**
@@ -26,8 +26,7 @@ import androidx.core.widget.NestedScrollView
  */
 abstract class BaseParamDialogBuilder<R>(
     protected val context: Context,
-    protected val title: String,
-    protected val anchor: View?
+    protected val title: String
 ) {
     protected val layout: LinearLayout = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
     protected val inputs: MutableList<View> = mutableListOf()
@@ -231,9 +230,8 @@ class SingleParamDialogBuilder(
     private val paramType: Class<*>,
     private val genericType: Type? = null,
     private val keyType: Class<*>? = null,
-    private val initialText: String = "",
-    anchor: View?
-) : BaseParamDialogBuilder<Any>(context, title, anchor) {
+    private val initialText: String = ""
+) : BaseParamDialogBuilder<Any>(context, title) {
     // callback(success, parsedValue or Pair(key,value), error)
     override fun show(callback: (success: Boolean, parsedValue: Any?, error: String?) -> Unit) {
         val chosenKey = arrayOfNulls<Class<*>>(1)
@@ -268,9 +266,9 @@ class SingleParamDialogBuilder(
             onPositive = { dialog ->
                 if (keyType != null && inputs.size >= 2) {
                     val k = getParsedInputAt(0, keyType, null, chosenKey[0])
-                        ?: run { anchor?.let { Snackbar.make(it, context.getString(R.string.error_prefix, "Could not parse key"), Snackbar.LENGTH_SHORT).show() }; return@showDialogWithPreview }
+                        ?: run { Toast.makeText(context, context.getString(R.string.error_prefix, "Could not parse key"), Toast.LENGTH_SHORT).show(); return@showDialogWithPreview }
                     val v = getParsedInputAt(1, paramType, genericType, chosenVal[0])
-                        ?: run { anchor?.let { Snackbar.make(it, context.getString(R.string.error_prefix, "Could not parse value"), Snackbar.LENGTH_SHORT).show() }; return@showDialogWithPreview }
+                        ?: run { Toast.makeText(context, context.getString(R.string.error_prefix, "Could not parse value"), Toast.LENGTH_SHORT).show(); return@showDialogWithPreview }
                     callback(true, Pair(k, v), null)
                     dialog.dismiss()
                     return@showDialogWithPreview
@@ -280,9 +278,7 @@ class SingleParamDialogBuilder(
                     callback(true, parsed, null)
                     dialog.dismiss()
                 } else {
-                    anchor?.let {
-                        Snackbar.make(it, context.getString(R.string.error_prefix, "Could not parse input"), Snackbar.LENGTH_SHORT).show()
-                    }
+                    Toast.makeText(context, context.getString(R.string.error_prefix, "Could not parse input"), Toast.LENGTH_SHORT).show()
                 }
             },
             positiveLabelRes = R.string.ok
@@ -299,9 +295,8 @@ class MultiParamDialogBuilder(
     private val paramTypes: Array<Class<*>>,
     private val genericTypes: Array<Type?>? = null,
     private val paramNames: Array<String>? = null,
-    private val initialTexts: Array<String?>? = null,
-    anchor: View?
-) : BaseParamDialogBuilder<Array<Any?>>(context, title, anchor) {
+    private val initialTexts: Array<String?>? = null
+) : BaseParamDialogBuilder<Array<Any?>>(context, title) {
     override fun show(callback: (Boolean, Array<Any?>?, String?) -> Unit) {
         val chosenElementClasses = MutableList<Class<*>?>(paramTypes.size) { null }
 
