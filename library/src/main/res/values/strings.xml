@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Reflection Explorer</string>
+    <string name="app_name_reflection_explorer">Reflection Explorer</string>
     <string name="collection_size">%1$d items</string>
     <string name="action_reevaluate">Re-evaluate field</string>
     <string name="action_set_value">Set field value</string>

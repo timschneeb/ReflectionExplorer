@@ -36,4 +36,11 @@ class MainViewModel : ViewModel() {
 
     // LiveData used to notify observers when the filter object was changed
     val memberFilterLive: MutableLiveData<MemberFilter> = MutableLiveData(memberFilter)
+
+    // LiveData holding the current search query (empty string = no filtering)
+    val searchQueryLive: MutableLiveData<String> = MutableLiveData("")
+
+    fun setSearchQuery(q: String?) {
+        searchQueryLive.value = q ?: ""
+    }
 }

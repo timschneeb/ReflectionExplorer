@@ -1,6 +1,7 @@
 package me.timschneeberger.reflectionexplorer.adapter
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -39,6 +40,9 @@ class MembersAdapter(
     private val collapsedClasses: MutableSet<String>,
     private val onClick: (MemberInfo) -> Unit
 ) : ExpandableListAdapter<MemberInfo>(items, collapsedClasses) {
+
+    // Keep original list including ClassHeaderInfo entries so we can filter in-adapter
+    private val originalFullItems: MutableList<MemberInfo> = items.toMutableList()
 
     private fun runWithActivity(anchor: View, block: (MainActivity) -> Unit) =
         (anchor.context as? MainActivity)?.let(block)
@@ -144,6 +148,51 @@ class MembersAdapter(
         }
     }
 
+    fun filter(query: String?) {
+        val q = query?.trim()?.lowercase() ?: ""
+        if (q.isEmpty()) {
+            // show full original set
+            super.update(originalFullItems.toList())
+            return
+        }
+
+        val out = mutableListOf<MemberInfo>()
+        var currentHeader: ClassHeaderInfo? = null
+        var buffer = mutableListOf<MemberInfo>()
+
+        fun flushBuffer() {
+            if (buffer.isNotEmpty()) {
+                currentHeader?.let { out.add(it) }
+                out.addAll(buffer)
+            }
+            buffer = mutableListOf()
+        }
+
+        for (m in originalFullItems) {
+            if (m is ClassHeaderInfo) {
+                flushBuffer()
+                currentHeader = m
+            } else {
+                val matches = when (m) {
+                    is ElementInfo -> {
+                        try { (m as CollectionMember).getValue(rootInstance)?.toString() ?: "" } catch (_: Exception) { "" }
+                            .lowercase()
+                            .contains(q)
+                    }
+                    is MapEntryInfo -> {
+                        m.key.toString().lowercase().contains(q)
+                    }
+                    else -> m.name.lowercase().contains(q)
+                }
+
+                if (matches) buffer.add(m)
+            }
+        }
+
+        flushBuffer()
+        super.update(out)
+    }
+
     // Helpers to mutate collection/map elements via ReflectionInspector
     private fun performDelete(activity: MainActivity, item: MemberInfo) {
         if (item is CollectionMember) {
@@ -185,6 +234,9 @@ class MembersAdapter(
     @SuppressLint("NotifyDataSetChanged")
     fun update(newItems: List<MemberInfo>, newRootInstance: Any? = null) {
         newRootInstance?.let { this.rootInstance = it }
+        // keep original list in sync
+        originalFullItems.clear()
+        originalFullItems.addAll(newItems)
         super.update(newItems)
     }
 }

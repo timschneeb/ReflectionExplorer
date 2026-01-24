@@ -1,11 +1,13 @@
 package me.timschneeberger.reflectionexplorer
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.Menu
 import android.view.MenuItem
 import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SearchView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updateLayoutParams
@@ -92,7 +94,7 @@ class MainActivity : AppCompatActivity() {
             val count = top.listMembers().size
             getString(R.string.header_title, top::class.java.simpleName, count)
         } else {
-            getString(R.string.app_name)
+            getString(R.string.app_name_reflection_explorer)
         }
         supportActionBar?.title = title
     }
@@ -167,10 +169,30 @@ class MainActivity : AppCompatActivity() {
         updateTitle()
     }
 
+    @SuppressLint("PrivateResource")
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.menu_inspector, menu)
         // Initially hide refresh action unless inspector is shown
         menu?.findItem(R.id.action_refresh_fields)?.isVisible = supportFragmentManager.findFragmentById(R.id.container) is InspectorFragment
+
+        // Wire up search view to shared ViewModel
+        val searchItem = menu?.findItem(R.id.action_search)
+        val searchView = searchItem?.actionView as? SearchView
+        searchView?.queryHint = getString(androidx.appcompat.R.string.search_menu_title)
+        searchView?.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean {
+                vm.setSearchQuery(query)
+                // collapse keyboard / view by clearing focus
+                searchView.clearFocus()
+                return true
+            }
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                vm.setSearchQuery(newText)
+                return true
+            }
+        })
+
         return true
     }
 

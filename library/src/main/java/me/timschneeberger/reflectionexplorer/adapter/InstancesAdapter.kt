@@ -43,6 +43,21 @@ class InstancesAdapter(
     itemsWithHeaders(items),
     collapsedGroups
 ) {
+    private val originalItems: MutableList<Instance> = items.toMutableList()
+
+    /**
+     * Apply a text filter (case-insensitive) on the original items and update the visible list.
+     * Empty or blank query clears the filter and shows all items.
+     */
+    fun filter(query: String?) {
+        val q = query?.trim()?.lowercase() ?: ""
+        val filteredRaw = if (q.isEmpty()) originalItems.toList() else originalItems.filter { inst ->
+            val name = inst.name ?: inst.instance::class.java.simpleName
+            val combined = listOfNotNull(name, inst.instance::class.java.simpleName, inst.instance.toString()).joinToString(" ")
+            combined.lowercase().contains(q)
+        }
+        super.update(itemsWithHeaders(filteredRaw))
+    }
 
     // ViewHolders
     class VH(val binding: ItemMemberBinding) : RecyclerView.ViewHolder(binding.root)

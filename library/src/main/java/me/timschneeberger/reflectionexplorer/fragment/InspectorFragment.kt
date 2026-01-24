@@ -123,6 +123,8 @@ class InspectorFragment : Fragment() {
         mainVm.memberFilterLive.observe(viewLifecycleOwner) { f ->
             val updated = applyFilters(inst.listMembers(), mainVm)
             membersAdapter?.update(updated, inst)
+            // re-apply current search query so search + filters compose
+            membersAdapter?.filter(mainVm.searchQueryLive.value)
             binding.filterButton.isChecked = f.anyFiltersActive()
         }
 
@@ -131,6 +133,16 @@ class InspectorFragment : Fragment() {
         binding.filterButton.isChecked = mainVm.memberFilter.anyFiltersActive()
         binding.filterButton.addOnCheckedChangeListener { _, _ ->
             binding.filterButton.isChecked = mainVm.memberFilter.anyFiltersActive()
+        }
+
+        // Observe shared search query and apply filtering to members displayed
+        mainVm.searchQueryLive.observe(viewLifecycleOwner) { query ->
+            // First, apply member filters to get the base set
+            val base = applyFilters(inst.listMembers(), mainVm)
+            // update adapter's original list to the base set
+            membersAdapter?.update(base, inst)
+            // then apply adapter-level search filter
+            membersAdapter?.filter(query)
         }
 
         // Set up add-element button when the inspected instance is a collection/array/map
