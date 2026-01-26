@@ -9,7 +9,7 @@ import java.util.Collections
 /**
  * Represents an instance to be inspected.
  */
-data class Instance(
+open class Instance(
     /** The instance to inspect. */
     val instance: Any,
     /** Optional name to show in the list. If null, the class name will be used. */
@@ -17,6 +17,9 @@ data class Instance(
     /** Optional group to categorize instances. */
     val group: Group? = null
 )
+
+class ErrorInstance(message: String, attachment: Any? = null) :
+    Instance(attachment ?: Any(), message, null)
 
 /**
  * Represents a group/category for instances.

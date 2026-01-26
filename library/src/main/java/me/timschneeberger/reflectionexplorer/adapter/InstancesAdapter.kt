@@ -5,6 +5,7 @@ import android.view.ViewGroup
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
+import me.timschneeberger.reflectionexplorer.ErrorInstance
 import me.timschneeberger.reflectionexplorer.Instance
 import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
@@ -102,7 +103,7 @@ class InstancesAdapter(
         hv.binding.apply {
             memberTitle.text = item.name ?: item.instance::class.java.simpleName
             memberSubtitle.text = item.instance.toString()
-            memberIcon.setImageResource(R.drawable.ic_class)
+            memberIcon.setImageResource(if(item is ErrorInstance) R.drawable.ic_error_class else R.drawable.ic_class)
             root.setOnClickListener { onClick(item) }
         }
     }
