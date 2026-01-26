@@ -18,6 +18,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
 import me.timschneeberger.reflectionexplorer.MainActivity
 import me.timschneeberger.reflectionexplorer.R
+import me.timschneeberger.reflectionexplorer.ReflectionExplorer
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
 import me.timschneeberger.reflectionexplorer.model.InspectorViewModel
 import me.timschneeberger.reflectionexplorer.adapter.BreadcrumbAdapter
@@ -258,8 +259,7 @@ class InspectorFragment : Fragment() {
         if (value != null && value.canInspectType()) {
             popup.menu.add(R.string.action_inspect).apply {
                 setOnMenuItemClickListener {
-                    MainActivity.pendingInspection = value
-                    startActivity(Intent(requireContext(), MainActivity::class.java))
+                    ReflectionExplorer.launchExplorerFor(requireContext(), value)
                     true
                 }
             }
