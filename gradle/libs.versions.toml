@@ -11,6 +11,7 @@ constraintlayout = "2.2.1"
 recyclerview = "1.4.0"
 dexlib2 = "2.5.2"
 refine = "4.4.0"
+ezxhelper = "3.1.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -26,6 +27,7 @@ dexlib2 = { group = "org.smali", name = "dexlib2", version.ref = "dexlib2" }
 refine-annotation-processor = { group = "dev.rikka.tools.refine", name = "annotation-processor", version.ref = "refine" }
 refine-annotation = { group = "dev.rikka.tools.refine", name = "annotation", version.ref = "refine" }
 refine-runtime = { group = "dev.rikka.tools.refine", name = "runtime", version.ref = "refine" }
+ezxhelper-core = { group = "io.github.kyuubiran.ezxhelper", name = "core", version.ref = "ezxhelper" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
