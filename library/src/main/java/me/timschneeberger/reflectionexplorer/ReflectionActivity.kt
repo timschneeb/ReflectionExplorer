@@ -1,7 +1,9 @@
 package me.timschneeberger.reflectionexplorer
 
 import android.annotation.SuppressLint
+import android.os.Build
 import android.os.Bundle
+import android.os.Process
 import android.view.Menu
 import android.view.MenuItem
 import android.view.ViewGroup
@@ -94,6 +96,8 @@ class ReflectionActivity : AppCompatActivity() {
             val top = vm.inspectionStack.last()
             val count = top.listMembers().size
             getString(R.string.header_title, top::class.java.simpleName, count)
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
+            Process.myProcessName()
         } else {
             getString(R.string.app_name_reflection_explorer)
         }
