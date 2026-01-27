@@ -20,7 +20,7 @@ import me.timschneeberger.reflectionexplorer.utils.castOrNull
 import me.timschneeberger.reflectionexplorer.utils.reflection.canInspectType
 import me.timschneeberger.reflectionexplorer.utils.reflection.listMembers
 
-class MainActivity : AppCompatActivity() {
+class ReflectionActivity : AppCompatActivity() {
     private lateinit var binding: ActivityReflectionMainBinding
     private val vm: MainViewModel by lazy { ViewModelProvider(this)[MainViewModel::class.java] }
 
@@ -117,10 +117,8 @@ class MainActivity : AppCompatActivity() {
                 .replace(R.id.container, fragment)
                 .addToBackStack(null)
                 .commit()
-            // menu should update to show inspector actions
-            invalidateOptionsMenu()
 
-            // update title to reflect newly opened inspector
+            invalidateOptionsMenu()
             updateTitle()
         }
     }
@@ -128,8 +126,6 @@ class MainActivity : AppCompatActivity() {
     @SuppressLint("PrivateResource")
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
         menuInflater.inflate(R.menu.menu_inspector, menu)
-        // Initially hide refresh action unless inspector is shown
-        menu?.findItem(R.id.action_refresh_fields)?.isVisible = supportFragmentManager.findFragmentById(R.id.container) is InspectorFragment
 
         // Wire up search view to shared ViewModel
         val searchItem = menu?.findItem(R.id.action_search)
@@ -155,18 +151,23 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_refresh_fields -> {
-                performRefreshFields()
+                performRefresh()
                 true
             }
             else -> super.onOptionsItemSelected(item)
         }
     }
 
-    private fun performRefreshFields() {
-        // Notify current InspectorFragment to refresh values (this will re-fetch field values and update adapter)
+    private fun performRefresh() {
+        // Notify current fragment to refresh values
         supportFragmentManager
             .findFragmentById(R.id.container)
             .castOrNull<InspectorFragment>()
             ?.refreshMembers()
+
+        supportFragmentManager
+            .findFragmentById(R.id.container)
+            .castOrNull<InstancesFragment>()
+            ?.refreshInstances()
     }
 }

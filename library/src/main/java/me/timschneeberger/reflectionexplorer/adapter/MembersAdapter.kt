@@ -9,8 +9,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
-import me.timschneeberger.reflectionexplorer.MainActivity
-import me.timschneeberger.reflectionexplorer.fragment.InspectorFragment
+import me.timschneeberger.reflectionexplorer.ReflectionActivity
 import me.timschneeberger.reflectionexplorer.utils.reflection.ClassHeaderInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.ElementInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.FieldInfo
@@ -47,8 +46,8 @@ class MembersAdapter(
     // Keep original list including ClassHeaderInfo entries so we can filter in-adapter
     private val originalFullItems: MutableList<MemberInfo> = items.toMutableList()
 
-    private fun activityOrNull(anchor: View): MainActivity? =
-        anchor.context.castOrNull<MainActivity>()
+    private fun activityOrNull(anchor: View): ReflectionActivity? =
+        anchor.context.castOrNull<ReflectionActivity>()
 
     override fun isHeader(item: MemberInfo): Boolean = item is ClassHeaderInfo
     override fun headerKey(item: MemberInfo): String = item.castOrNull<ClassHeaderInfo>()?.cls?.name ?: item.name
@@ -199,14 +198,14 @@ class MembersAdapter(
     }
 
     // Helpers to mutate collection/map elements via ReflectionInspector
-    private fun performDelete(activity: MainActivity, item: MemberInfo) {
+    private fun performDelete(activity: ReflectionActivity, item: MemberInfo) {
         if (item is CollectionMember) {
             val newRoot = item.applyDelete(rootInstance)
             if (newRoot != null) onRequestReplaceStackAt(stackIndex, newRoot)
         }
     }
 
-    private fun performEdit(activity: MainActivity, item: MemberInfo) {
+    private fun performEdit(activity: ReflectionActivity, item: MemberInfo) {
         when (item) {
             is FieldInfo -> activity.showSetFieldDialog(rootInstance, item) { ok, _ -> if (ok) onRequestReplaceStackAt(stackIndex, rootInstance) }
             is CollectionMember -> {

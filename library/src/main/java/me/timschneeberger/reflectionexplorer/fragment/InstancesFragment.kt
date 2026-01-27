@@ -7,15 +7,18 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import me.timschneeberger.reflectionexplorer.MainActivity
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import me.timschneeberger.reflectionexplorer.ReflectionActivity
 import me.timschneeberger.reflectionexplorer.ReflectionExplorer
 import me.timschneeberger.reflectionexplorer.adapter.InstancesAdapter
 import me.timschneeberger.reflectionexplorer.model.InstancesViewModel
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
 import me.timschneeberger.reflectionexplorer.utils.cast
-import me.timschneeberger.reflectionexplorer.utils.castOrNull
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
 
 class InstancesFragment : Fragment() {
@@ -28,9 +31,12 @@ class InstancesFragment : Fragment() {
         vm = ViewModelProvider(this)[InstancesViewModel::class.java]
         val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
 
-        instancesAdapter = InstancesAdapter(ReflectionExplorer.instances.toList(), vm.collapsedGroups) {
+        instancesAdapter = InstancesAdapter(
+            ReflectionExplorer.instancesProvider?.provide(requireContext()) ?: emptyList(),
+            vm.collapsedGroups
+        ) {
             activity
-                ?.cast<MainActivity>()
+                ?.cast<ReflectionActivity>()
                 ?.handleInstanceSelected(it.instance)
         }
 
@@ -84,6 +90,32 @@ class InstancesFragment : Fragment() {
         val lm = rv.layoutManager as? LinearLayoutManager ?: return
         if (vm.savedPosition != RecyclerView.NO_POSITION) {
             lm.scrollToPositionWithOffset(vm.savedPosition, vm.savedOffset)
+        }
+    }
+
+    fun refreshInstances() {
+        // Re-run the provider off the main thread and update the adapter safely.
+        val provider = ReflectionExplorer.instancesProvider ?: return
+        val adapter = instancesAdapter ?: return
+
+        // Save scroll state and collapsed groups (vm already holds collapsedGroups)
+        saveScrollPositionIfAny()
+
+        // Launch coroutine to run provider on IO dispatcher
+        lifecycleScope.launch {
+            // Update adapter on main thread
+            adapter.setItems(
+                withContext(Dispatchers.IO) {
+                    provider.provide(requireContext())
+                }
+            )
+
+            // Reapply any active search filter from shared ViewModel
+            val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
+            adapter.filter(mainVm.searchQueryLive.value)
+
+            // Restore scroll position after layout
+            recyclerView?.post { restoreScrollPositionIfAny() }
         }
     }
 }

@@ -65,6 +65,13 @@ class InstancesAdapter(
         super.update(itemsWithHeaders(filteredRaw))
     }
 
+    fun setItems(items: List<Instance>) {
+        originalItems.clear()
+        originalItems.addAll(items)
+        // Update the underlying fullItems list (will rebuild visibleItems)
+        super.update(itemsWithHeaders(originalItems))
+    }
+
     // ViewHolders
     class VH(val binding: ItemMemberBinding) : RecyclerView.ViewHolder(binding.root)
     class HeaderVH(val binding: ItemMemberHeaderBinding) : RecyclerView.ViewHolder(binding.root)

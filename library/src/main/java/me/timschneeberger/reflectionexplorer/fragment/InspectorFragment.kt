@@ -2,12 +2,10 @@ package me.timschneeberger.reflectionexplorer.fragment
 
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.getSystemService
 import androidx.core.view.isVisible
@@ -16,7 +14,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
-import me.timschneeberger.reflectionexplorer.MainActivity
+import me.timschneeberger.reflectionexplorer.ReflectionActivity
 import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.ReflectionExplorer
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
@@ -60,7 +58,7 @@ class InspectorFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         binding = FragmentInspectorBinding.inflate(inflater, container, false)
 
-        val activity = activity.castOrNull<MainActivity>()
+        val activity = activity.castOrNull<ReflectionActivity>()
         val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
 
         // resolve instance from MainViewModel stack; if missing, show empty state
@@ -399,7 +397,7 @@ class InspectorFragment : Fragment() {
         view?.post(::refreshMembers)
 
         // Update title to reflect changed contents
-        (activity as? MainActivity)?.updateTitle()
+        (activity as? ReflectionActivity)?.updateTitle()
     }
 
     private fun getInspectionTrailFromVm(mainVm: MainViewModel, instanceFallback: Any?): List<String> {

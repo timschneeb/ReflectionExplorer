@@ -4,7 +4,6 @@ package me.timschneeberger.reflectionexplorer
 
 import android.content.Context
 import android.content.Intent
-import java.util.Collections
 
 /**
  * Represents an instance to be inspected.
@@ -36,30 +35,40 @@ data class Group(
  */
 object ReflectionExplorer {
     /**
-     * A list of instances to available in the main menu.
+     * Instance provider that returns the list of instances to show.
+     * It will be called when the main activity is launched or refreshed by the user.
      */
-    @JvmField
-    val instances: MutableList<Instance> = Collections.synchronizedList(mutableListOf())
+    fun interface IInstancesProvider {
+        fun provide(context: Context): List<Instance>
+    }
 
     /**
      * Optional custom launcher that host apps can provide.
      * If set, this will be used instead of Context.startActivity so callers can control how
      * activities are started (for example by using a process-aware launcher).
      */
-    fun interface ActivityLauncher {
+    fun interface IActivityLauncher {
         fun launch(context: Context, intent: Intent)
     }
 
+    /**
+     * Provides a list of instances to available in the main menu.
+     */
     @JvmField
     @Volatile
-    var activityLauncher: ActivityLauncher? = null
+    var instancesProvider: IInstancesProvider? = null
+
+
+    @JvmField
+    @Volatile
+    var activityLauncher: IActivityLauncher? = null
 
     /**
      * Launches the main explorer activity with the instance selection.
      */
     @JvmStatic
-    fun launchMainActivity(context: Context) {
-        val intent = Intent(context, MainActivity::class.java)
+    fun launch(context: Context) {
+        val intent = Intent(context, ReflectionActivity::class.java)
         val launcher = activityLauncher
         if (launcher != null) launcher.launch(context, intent) else context.startActivity(intent)
     }
@@ -69,7 +78,7 @@ object ReflectionExplorer {
      */
     @JvmStatic
     fun launchExplorerFor(context: Context, instance: Any) {
-        MainActivity.pendingInspection = instance
-        launchMainActivity(context)
+        ReflectionActivity.pendingInspection = instance
+        launch(context)
     }
 }
