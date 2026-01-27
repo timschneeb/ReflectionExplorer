@@ -28,13 +28,18 @@ class InstancesFragment : Fragment() {
     private var instancesAdapter: InstancesAdapter? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        vm = ViewModelProvider(this)[InstancesViewModel::class.java]
+        // Use activity-scoped ViewModel so collapsedGroups and scroll state survive fragment
+        // navigation (fragment replacement) within the same activity.
+        vm = ViewModelProvider(requireActivity())[InstancesViewModel::class.java]
         val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
 
-        instancesAdapter = InstancesAdapter(
-            ReflectionExplorer.instancesProvider?.provide(requireContext()) ?: emptyList(),
-            vm.collapsedGroups
-        ) {
+        val items = ReflectionExplorer.instancesProvider?.provide(requireContext()) ?: emptyList()
+        if (vm.initialLoad) {
+            vm.initialLoad = false
+            vm.collapsedGroups.addAll(items.mapNotNull { it.group?.name }.distinct())
+        }
+
+        instancesAdapter = InstancesAdapter(items, vm.collapsedGroups) {
             activity
                 ?.cast<ReflectionActivity>()
                 ?.handleInstanceSelected(it.instance)

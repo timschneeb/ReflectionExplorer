@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.recyclerview.widget.RecyclerView
 
 class InstancesViewModel : ViewModel() {
+    var initialLoad: Boolean = true
     // store collapsed group names so UI state survives configuration changes
     val collapsedGroups: MutableSet<String> = mutableSetOf()
 

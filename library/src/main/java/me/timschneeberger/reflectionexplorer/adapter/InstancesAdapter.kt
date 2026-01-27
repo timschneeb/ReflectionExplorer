@@ -46,11 +46,6 @@ class InstancesAdapter(
 ) {
     private val originalItems: MutableList<Instance> = items.toMutableList()
 
-    init {
-        // In the instance list, collapse all groups by default
-        collapsedGroups.addAll(items.mapNotNull { it.group?.name }.distinct())
-    }
-
     /**
      * Apply a text filter (case-insensitive) on the original items and update the visible list.
      * Empty or blank query clears the filter and shows all items.
