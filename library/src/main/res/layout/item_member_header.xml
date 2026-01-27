@@ -36,7 +36,8 @@
                 android:textColor="?attr/colorOnSurface"
                 android:textStyle="bold"
                 android:maxLines="1"
-                android:ellipsize="end" />
+                android:ellipsize="end"
+                android:fontFeatureSettings="liga 0" />
 
             <TextView
                 android:id="@+id/header_subtitle"
