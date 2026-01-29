@@ -57,7 +57,7 @@ class ReflectionActivity : AppCompatActivity() {
         }
 
         setSupportActionBar(binding.toolbar)
-        supportActionBar?.setDisplayHomeAsUpEnabled(supportFragmentManager.backStackEntryCount > 0)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
         updateTitle()
 
         // Keep inspectionStack in sync with fragment backstack and update toolbar/back button and breadcrumbs.
@@ -67,10 +67,6 @@ class ReflectionActivity : AppCompatActivity() {
                 finish()
                 return@addOnBackStackChangedListener
             }
-
-            supportActionBar?.setDisplayHomeAsUpEnabled(
-                supportFragmentManager.backStackEntryCount > 0
-            )
 
             // trim vm stack to match backstack
             while (vm.inspectionStack.size > supportFragmentManager.backStackEntryCount)
