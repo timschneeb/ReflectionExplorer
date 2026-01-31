@@ -1,16 +1,16 @@
 package me.timschneeberger.reflectionexplorer.utils.reflection
 
 import android.util.Log
-import java.lang.reflect.Array as JArray
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 import java.util.Collection
 import java.util.List
 import java.util.Map
+import java.lang.reflect.Array as JArray
 
 object ReflectionParser {
     fun canParseType(type: Class<*>): Boolean = when (type) {
-        String::class.java,
+        String::class.java, CharSequence::class.java,
         Int::class.javaObjectType, Int::class.javaPrimitiveType!!,
         Long::class.javaObjectType, Long::class.javaPrimitiveType!!,
         Boolean::class.javaObjectType, Boolean::class.javaPrimitiveType!!,
@@ -21,7 +21,7 @@ object ReflectionParser {
 
     private fun parsePrimitiveType(text: String, type: Class<*>): Any? {
         return when (type) {
-            String::class.java -> text
+            String::class.java, CharSequence::class.java -> text
             Int::class.javaObjectType, Int::class.javaPrimitiveType!! -> text.toIntOrNull()
             Long::class.javaObjectType, Long::class.javaPrimitiveType!! -> text.toLongOrNull()
             Boolean::class.javaObjectType, Boolean::class.javaPrimitiveType!! -> when (text.lowercase()) { "true" -> true; else -> false }
