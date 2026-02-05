@@ -14,25 +14,26 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ViewModelProvider
 import androidx.recyclerview.widget.LinearLayoutManager
-import me.timschneeberger.reflectionexplorer.ReflectionActivity
 import me.timschneeberger.reflectionexplorer.R
+import me.timschneeberger.reflectionexplorer.ReflectionActivity
 import me.timschneeberger.reflectionexplorer.ReflectionExplorer
-import me.timschneeberger.reflectionexplorer.model.MainViewModel
-import me.timschneeberger.reflectionexplorer.model.InspectorViewModel
 import me.timschneeberger.reflectionexplorer.adapter.BreadcrumbAdapter
 import me.timschneeberger.reflectionexplorer.adapter.MembersAdapter
 import me.timschneeberger.reflectionexplorer.databinding.FragmentInspectorBinding
-import me.timschneeberger.reflectionexplorer.utils.reflection.ClassHeaderInfo
-import me.timschneeberger.reflectionexplorer.utils.reflection.CollectionMember
+import me.timschneeberger.reflectionexplorer.model.InspectorViewModel
+import me.timschneeberger.reflectionexplorer.model.MainViewModel
+import me.timschneeberger.reflectionexplorer.model.StaticClass
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showEditValueDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showErrorDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showMethodInvocationDialog
 import me.timschneeberger.reflectionexplorer.utils.castOrNull
+import me.timschneeberger.reflectionexplorer.utils.reflection.ClassHeaderInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.CollectionMember
 import me.timschneeberger.reflectionexplorer.utils.reflection.ElementInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.MapEntryInfo
-import me.timschneeberger.reflectionexplorer.utils.reflection.MethodInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.MemberInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.MethodInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.ReflectionParser
 import me.timschneeberger.reflectionexplorer.utils.reflection.appendToArray
 import me.timschneeberger.reflectionexplorer.utils.reflection.canInspectType
@@ -401,7 +402,10 @@ class InspectorFragment : Fragment() {
     }
 
     private fun getInspectionTrailFromVm(mainVm: MainViewModel, instanceFallback: Any?): List<String> {
-        val trail = mainVm.inspectionStack.map { it::class.java.simpleName }
+        val trail = mainVm.inspectionStack.map {
+            // Special case: handle static class wrapper
+            if (it is StaticClass && it.target != null) it.target.simpleName else it::class.java.simpleName
+        }
         return trail.ifEmpty { listOf(instanceFallback?.javaClass?.simpleName ?: "root") }
     }
 

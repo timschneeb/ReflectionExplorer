@@ -1,8 +1,15 @@
 package me.timschneeberger.reflectionexplorer.utils
 
 import android.content.Context
+import android.text.Editable
+import android.text.InputType
+import android.view.LayoutInflater
+import android.widget.TextView
+import androidx.annotation.StringRes
+import androidx.appcompat.app.AlertDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import me.timschneeberger.reflectionexplorer.R
+import me.timschneeberger.reflectionexplorer.databinding.DialogTextinputBinding
 import me.timschneeberger.reflectionexplorer.utils.dex.ParamNames
 import me.timschneeberger.reflectionexplorer.utils.reflection.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.invokeMethod
@@ -81,6 +88,48 @@ object Dialogs {
             .setTitle(R.string.error)
             .setMessage(getString(R.string.error_prefix, e.stackTraceToString()))
             .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
+
+    fun Context.showInputAlert(
+        layoutInflater: LayoutInflater,
+        @StringRes title: Int,
+        @StringRes hint: Int,
+        value: String = "",
+        isNumberInput: Boolean = false,
+        callback: ((String) -> Unit)
+    ) {
+        showInputAlert(layoutInflater, getString(title), getString(hint), value, isNumberInput, callback)
+    }
+
+    fun Context.showInputAlert(
+        layoutInflater: LayoutInflater,
+        title: String?,
+        hint: String?,
+        value: String = "",
+        isNumberInput: Boolean = false,
+        callback: ((String) -> Unit)
+    ) {
+        val content = DialogTextinputBinding.inflate(layoutInflater).apply {
+            textInputLayout.hint = hint
+            text1.text = Editable.Factory.getInstance().newEditable(value)
+            if(isNumberInput)
+                text1.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setView(content.root)
+            .setPositiveButton(android.R.string.ok) { inputDialog, _ ->
+                (inputDialog as AlertDialog)
+                    .findViewById<TextView>(android.R.id.text1)
+                    ?.let {
+                        callback.invoke(it.text.toString())
+                    }
+            }
+            .setNegativeButton(android.R.string.cancel) { _, _ -> }
+            .create()
             .show()
     }
 

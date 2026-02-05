@@ -1,15 +1,11 @@
 package me.timschneeberger.reflectionexplorer.utils.dex
 
 import android.annotation.SuppressLint
-import android.app.Application
-import android.app.LoadedApk
 import android.content.Context
-import android.content.ContextWrapper
-import android.util.ArrayMap
 import android.util.Log
 import dalvik.system.BaseDexClassLoader
+import me.timschneeberger.reflectionexplorer.utils.ClassLoaderLocator
 import java.io.File
-import kotlin.sequences.forEach
 
 object DexLocator {
     private const val TAG = "DexLocator"
@@ -37,37 +33,9 @@ object DexLocator {
         }.distinct().toTypedArray()
     }
 
-
     @SuppressLint("DiscouragedPrivateApi")
-    private fun locateDexFromContext(context: Context): Array<String> {
-        // Contexts may be wrapped, unwrap them to get the ContextImpl instance
-        if(context is ContextWrapper) {
-            val baseContext = context.baseContext
-            if(baseContext != null && baseContext != context) {
-                return locateDexFromContext(baseContext)
-            }
-            throw IllegalStateException("Unable to locate base context from ContextWrapper")
-        }
-
-        if(context::class.java.name != "android.app.ContextImpl") {
-            throw IllegalArgumentException("Context is not an instance of ContextImpl: ${context::class.java.name}")
-        }
-
-        // Access mPackageInfo field (LoadedApk)
-        val loadedApk = context::class.java.getDeclaredField("mPackageInfo").run {
-            isAccessible = true
-            get(context) as LoadedApk
-        }
-
-        // Access sApplications field (ArrayMap<String, Application>)
-        val apps = LoadedApk::class.java.getDeclaredField("sApplications").run {
-            isAccessible = true
-            @Suppress("UNCHECKED_CAST")
-            get(loadedApk) as ArrayMap<String, Application>
-        }
-
-        return apps.values
-            .map { it.applicationContext.classLoader }
+    private fun locateDexFromContext(context: Context): Array<String> =
+        ClassLoaderLocator.locateFromContext(context)
             .mapNotNull {
                 // Get DexPathList
                 if (it is BaseDexClassLoader) {
@@ -96,7 +64,6 @@ object DexLocator {
                     throw IllegalStateException("No DEX paths located from context")
                 }
             }
-    }
 
     /**
      * Locate APK/DEX paths for this process by reading /proc/self/maps.

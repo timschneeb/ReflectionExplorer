@@ -18,6 +18,7 @@ import me.timschneeberger.reflectionexplorer.databinding.ActivityReflectionMainB
 import me.timschneeberger.reflectionexplorer.fragment.InspectorFragment
 import me.timschneeberger.reflectionexplorer.fragment.InstancesFragment
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
+import me.timschneeberger.reflectionexplorer.model.StaticClass
 import me.timschneeberger.reflectionexplorer.utils.castOrNull
 import me.timschneeberger.reflectionexplorer.utils.reflection.canInspectType
 import me.timschneeberger.reflectionexplorer.utils.reflection.listMembers
@@ -91,7 +92,12 @@ class ReflectionActivity : AppCompatActivity() {
         val title = if (vm.inspectionStack.isNotEmpty()) {
             val top = vm.inspectionStack.last()
             val count = top.listMembers().size
-            getString(R.string.header_title, top::class.java.simpleName, count)
+            getString(
+                R.string.header_title,
+                // Special case: handle static class wrapper
+                if (top is StaticClass && top.target != null) top.target.simpleName
+                else top::class.java.simpleName,
+                count)
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
             Process.myProcessName()
         } else {

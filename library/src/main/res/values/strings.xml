@@ -35,4 +35,10 @@
     <string name="action_open_inspector">Open in new inspector</string>
     <string name="action_copy_string">Copy as string</string>
     <string name="action_inspect">Inspect</string>
+
+    <string name="class_not_found">Could not find class: %1$s\n\nUsed class loaders:\n%2$s</string>
+    <string name="class_name_input">Enter qualified class name</string>
+    <string name="class_inspect">Inspect class…</string>
+    <string name="class_inspect_subtitle">Inspect any class statically</string>
+    <string name="class_name_hint">Example: android.app.ActivityThread</string>
 </resources>

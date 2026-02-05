@@ -10,14 +10,20 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import me.timschneeberger.reflectionexplorer.Instance
+import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.ReflectionActivity
 import me.timschneeberger.reflectionexplorer.ReflectionExplorer
 import me.timschneeberger.reflectionexplorer.adapter.InstancesAdapter
 import me.timschneeberger.reflectionexplorer.model.InstancesViewModel
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
+import me.timschneeberger.reflectionexplorer.model.StaticClass
+import me.timschneeberger.reflectionexplorer.utils.ClassLoaderLocator
+import me.timschneeberger.reflectionexplorer.utils.Dialogs.showInputAlert
 import me.timschneeberger.reflectionexplorer.utils.cast
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
 
@@ -33,16 +39,32 @@ class InstancesFragment : Fragment() {
         vm = ViewModelProvider(requireActivity())[InstancesViewModel::class.java]
         val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
 
-        val items = ReflectionExplorer.instancesProvider?.provide(requireContext()) ?: emptyList()
+        val providerItems = ReflectionExplorer.instancesProvider?.provide(requireContext()) ?: emptyList()
+        // Prepend a custom placeholder Instance that represents manual class input
+        val items = mutableListOf(
+            Instance(
+                instance = StaticClass(null, getString(R.string.class_inspect_subtitle)),
+                name = getString(R.string.class_inspect),
+                group = null
+            )
+        )
+        items.addAll(providerItems)
+
         if (vm.initialLoad) {
             vm.initialLoad = false
             vm.collapsedGroups.addAll(items.mapNotNull { it.group?.name }.distinct())
         }
 
         instancesAdapter = InstancesAdapter(items, vm.collapsedGroups) {
-            activity
-                ?.cast<ReflectionActivity>()
-                ?.handleInstanceSelected(it.instance)
+            // special-case our placeholder: prompt for class name
+            val inst = it.instance
+            if (inst is StaticClass && inst.target == null) {
+                showClassInputDialog()
+            } else {
+                activity
+                    ?.cast<ReflectionActivity>()
+                    ?.handleInstanceSelected(it.instance)
+            }
         }
 
         // Observe shared search query to filter displayed instances
@@ -64,6 +86,48 @@ class InstancesFragment : Fragment() {
             // Restore scroll after view is laid out
             it.post { restoreScrollPositionIfAny() }
             recyclerView = it
+        }
+    }
+
+    private fun showClassInputDialog() {
+        context?.showInputAlert(
+            layoutInflater,
+            getString(R.string.class_name_input),
+            getString(R.string.class_name_hint),
+            value = ""
+        ) { name ->
+            val trimmedName = name.trim()
+            if (trimmedName.isEmpty())
+                return@showInputAlert
+
+            // Try to load class off the main thread
+            lifecycleScope.launch {
+                context?.let { ctx ->
+                    val cls = withContext(Dispatchers.IO) {
+                        ClassLoaderLocator.findClassInProcess(ctx, trimmedName)
+                    }
+                    if (cls != null) {
+                        // Open inspector for a StaticClass wrapper holding the loaded Class
+                        activity?.cast<ReflectionActivity>()
+                            ?.handleInstanceSelected(StaticClass(cls, trimmedName))
+                    } else {
+                        MaterialAlertDialogBuilder(requireContext())
+                            .setTitle(R.string.error)
+                            .setMessage(
+                                getString(
+                                    R.string.class_not_found,
+                                    trimmedName,
+                                    ClassLoaderLocator.locateFromContext(ctx)
+                                        .joinToString(
+                                            "\n\n\n",
+                                            transform = ClassLoader::toString
+                                        )
+                                )
+                            ).setPositiveButton(android.R.string.ok, null)
+                            .show()
+                    }
+                }
+            }
         }
     }
 
@@ -108,12 +172,13 @@ class InstancesFragment : Fragment() {
 
         // Launch coroutine to run provider on IO dispatcher
         lifecycleScope.launch {
-            // Update adapter on main thread
-            adapter.setItems(
-                withContext(Dispatchers.IO) {
-                    provider.provide(requireContext())
-                }
+            val provided = withContext(Dispatchers.IO) { provider.provide(requireContext()) }
+            // Prepend the manual "Inspect class..." placeholder so it remains available after refresh
+            val items = mutableListOf(
+                Instance(instance = StaticClass(null, "Inspect class..."), name = "Inspect class...", group = null)
             )
+            items.addAll(provided)
+            adapter.setItems(items)
 
             // Reapply any active search filter from shared ViewModel
             val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]

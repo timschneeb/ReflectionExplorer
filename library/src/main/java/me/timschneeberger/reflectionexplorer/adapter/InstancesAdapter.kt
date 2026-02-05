@@ -10,6 +10,7 @@ import me.timschneeberger.reflectionexplorer.Instance
 import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
 import me.timschneeberger.reflectionexplorer.databinding.ItemMemberHeaderBinding
+import me.timschneeberger.reflectionexplorer.model.StaticClass
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
 
 // sentinel object used to mark header entries (so Instance can still be the single type T)
@@ -110,7 +111,14 @@ class InstancesAdapter(
         hv.binding.apply {
             memberTitle.text = item.name ?: item.instance::class.java.simpleName
             memberSubtitle.text = item.instance.toString()
-            memberIcon.setImageResource(if(item is ErrorInstance) R.drawable.ic_error_class else R.drawable.ic_class)
+            // Show plus icon for our StaticClass placeholder, otherwise show class/error icons
+            memberIcon.setImageResource(
+                when {
+                    item.instance is StaticClass && item.instance.target == null -> R.drawable.ic_package
+                    item is ErrorInstance -> R.drawable.ic_error_class
+                    else -> R.drawable.ic_class
+                }
+            )
             root.setOnClickListener { onClick(item) }
         }
     }

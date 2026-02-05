@@ -2,11 +2,11 @@ package me.timschneeberger.reflectionexplorer.utils.reflection
 
 import android.content.Context
 import me.timschneeberger.reflectionexplorer.R
+import me.timschneeberger.reflectionexplorer.model.StaticClass
 import java.lang.Number
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
-import kotlin.collections.get
 import java.lang.reflect.Array as JArray
 
 interface SettableMember : GettableMember {
@@ -155,6 +155,32 @@ fun Any?.invokeMethod(method: Method, args: Array<Any?> = emptyArray()): Any? {
 }
 
 fun Any.listMembers(): List<MemberInfo> {
+    // Special-case: our StaticClass wrapper to inspect static members of a target Class
+    if (this is StaticClass) {
+        val target = this.target ?: return emptyList()
+        val members = mutableListOf<MemberInfo>()
+
+        // Group declared static fields/methods by their declaring class along the superclass chain
+        var current: Class<*>? = target
+        while (current != null) {
+            val declaredFields = current.declaredFields
+                .filter { Modifier.isStatic(it.modifiers) }
+                .map { f -> f.apply { isAccessible = true }; FieldInfo(f.name, f) }
+            val declaredMethods = current.declaredMethods
+                .filter { Modifier.isStatic(it.modifiers) }
+                .map { m -> m.apply { isAccessible = true }; MethodInfo(m.name, m) }
+            if (declaredFields.isNotEmpty() || declaredMethods.isNotEmpty()) {
+                members.add(ClassHeaderInfo(current))
+                val combined = (declaredFields + declaredMethods).sortedBy { it.name }
+                members.addAll(combined)
+            }
+            current = current.superclass
+            if (current == Any::class.java) break
+        }
+
+        return members
+    }
+
     val cls = this::class.java
     val members = mutableListOf<MemberInfo>()
 
