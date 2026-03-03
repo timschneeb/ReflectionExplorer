@@ -13,6 +13,7 @@ dexlib2 = "2.5.2"
 refine = "4.4.0"
 ezxhelper = "3.1.0"
 preferences = "1.2.1"
+annotationJvm = "1.9.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -30,6 +31,7 @@ refine-annotation-processor = { group = "dev.rikka.tools.refine", name = "annota
 refine-annotation = { group = "dev.rikka.tools.refine", name = "annotation", version.ref = "refine" }
 refine-runtime = { group = "dev.rikka.tools.refine", name = "runtime", version.ref = "refine" }
 ezxhelper-core = { group = "io.github.kyuubiran.ezxhelper", name = "core", version.ref = "ezxhelper" }
+androidx-annotation-jvm = { group = "androidx.annotation", name = "annotation-jvm", version.ref = "annotationJvm" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
