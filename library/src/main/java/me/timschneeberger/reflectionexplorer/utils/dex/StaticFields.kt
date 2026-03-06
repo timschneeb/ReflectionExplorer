@@ -24,7 +24,13 @@ object StaticFields {
 
     fun lookup(context: Context, includeFramework: Boolean): List<StaticField>? {
         return try {
+            Log.e(TAG, context.applicationInfo.sourceDir)
              DexLocator.findLoadedPaths(context)?.flatMap { path ->
+                 if (path.contains("/${context.packageName}-")) {
+                     Log.d(TAG, "Skipping app's own APK at $path")
+                     return@flatMap emptySequence()
+                 }
+
                  if (!includeFramework && path == "/system/framework/framework.jar") {
                      return@flatMap emptySequence()
                  }
