@@ -21,10 +21,14 @@ import me.timschneeberger.reflectionexplorer.ReflectionExplorer
 import me.timschneeberger.reflectionexplorer.adapter.InstancesAdapter
 import me.timschneeberger.reflectionexplorer.model.InstancesViewModel
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
+import me.timschneeberger.reflectionexplorer.model.Shortcut
 import me.timschneeberger.reflectionexplorer.model.StaticClass
 import me.timschneeberger.reflectionexplorer.utils.ClassLoaderLocator
+import me.timschneeberger.reflectionexplorer.utils.Dialogs.createProgressDialog
+import me.timschneeberger.reflectionexplorer.utils.Dialogs.showErrorDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showInputAlert
 import me.timschneeberger.reflectionexplorer.utils.cast
+import me.timschneeberger.reflectionexplorer.utils.dex.StaticFields
 import me.timschneeberger.reflectionexplorer.utils.dpToPx
 
 class InstancesFragment : Fragment() {
@@ -33,6 +37,27 @@ class InstancesFragment : Fragment() {
     private lateinit var vm: InstancesViewModel
     private var instancesAdapter: InstancesAdapter? = null
 
+    private val shortcuts by lazy {
+        listOf(
+            Instance(
+                instance = Shortcut(
+                    getString(R.string.class_inspect_subtitle),
+                    Shortcut.Type.EnterStaticClass
+                ),
+                name = getString(R.string.class_inspect),
+                group = null
+            ),
+            Instance(
+                instance = Shortcut(
+                    getString(R.string.static_field_inspect_subtitle),
+                    Shortcut.Type.ScanStaticFields
+                ),
+                name = getString(R.string.static_field_inspect),
+                group = null
+            ),
+        )
+    }
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         // Use activity-scoped ViewModel so collapsedGroups and scroll state survive fragment
         // navigation (fragment replacement) within the same activity.
@@ -40,14 +65,8 @@ class InstancesFragment : Fragment() {
         val mainVm = ViewModelProvider(requireActivity())[MainViewModel::class.java]
 
         val providerItems = ReflectionExplorer.instancesProvider?.provide(requireContext()) ?: emptyList()
-        // Prepend a custom placeholder Instance that represents manual class input
-        val items = mutableListOf(
-            Instance(
-                instance = StaticClass(null, getString(R.string.class_inspect_subtitle)),
-                name = getString(R.string.class_inspect),
-                group = null
-            )
-        )
+        // Prepend a custom placeholder Instances
+        val items = shortcuts.toMutableList()
         items.addAll(providerItems)
 
         if (vm.initialLoad) {
@@ -56,14 +75,18 @@ class InstancesFragment : Fragment() {
         }
 
         instancesAdapter = InstancesAdapter(items, vm.collapsedGroups) {
-            // special-case our placeholder: prompt for class name
-            val inst = it.instance
-            if (inst is StaticClass && inst.target == null) {
-                showClassInputDialog()
-            } else {
-                activity
-                    ?.cast<ReflectionActivity>()
-                    ?.handleInstanceSelected(it.instance)
+            when (val inst = it.instance) {
+                is Shortcut if inst.type == Shortcut.Type.EnterStaticClass -> {
+                    showClassInputDialog()
+                }
+                is Shortcut if inst.type == Shortcut.Type.ScanStaticFields -> {
+                    runStaticFieldScan()
+                }
+                else -> {
+                    activity
+                        ?.cast<ReflectionActivity>()
+                        ?.handleInstanceSelected(it.instance)
+                }
             }
         }
 
@@ -89,6 +112,30 @@ class InstancesFragment : Fragment() {
         }
     }
 
+    private fun runStaticFieldScan() {
+        val ctx = activity ?: return
+        val progressDialog = ctx.createProgressDialog(getString(R.string.static_fields_scanning))
+
+        progressDialog.show()
+        Thread {
+            try {
+                val data = StaticFields.lookup(ctx) ?: throw Exception("Error during lookup")
+                val tree = StaticFields.makeStaticInstanceTree(data)
+                ctx.runOnUiThread {
+                    progressDialog.dismiss()
+                    activity
+                        ?.cast<ReflectionActivity>()
+                        ?.handleInstanceSelected(tree)
+                }
+            } catch (e: Exception) {
+                ctx.runOnUiThread {
+                    progressDialog.dismiss()
+                    ctx.showErrorDialog(e)
+                }
+            }
+        }.start()
+    }
+
     private fun showClassInputDialog() {
         context?.showInputAlert(
             layoutInflater,
@@ -109,7 +156,7 @@ class InstancesFragment : Fragment() {
                     if (cls != null) {
                         // Open inspector for a StaticClass wrapper holding the loaded Class
                         activity?.cast<ReflectionActivity>()
-                            ?.handleInstanceSelected(StaticClass(cls, trimmedName))
+                            ?.handleInstanceSelected(StaticClass(cls))
                     } else {
                         MaterialAlertDialogBuilder(requireContext())
                             .setTitle(R.string.error)
@@ -173,10 +220,7 @@ class InstancesFragment : Fragment() {
         // Launch coroutine to run provider on IO dispatcher
         lifecycleScope.launch {
             val provided = withContext(Dispatchers.IO) { provider.provide(requireContext()) }
-            // Prepend the manual "Inspect class..." placeholder so it remains available after refresh
-            val items = mutableListOf(
-                Instance(instance = StaticClass(null, "Inspect class..."), name = "Inspect class...", group = null)
-            )
+            val items = shortcuts.toMutableList()
             items.addAll(provided)
             adapter.setItems(items)
 

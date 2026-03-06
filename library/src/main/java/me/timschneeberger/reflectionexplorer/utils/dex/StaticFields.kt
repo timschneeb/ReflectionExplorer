@@ -43,20 +43,14 @@ object StaticFields {
                                 .filterNot { hiddenFieldTypeContains.contains(it.refType) }
                         }
                 }
-            }.also {
-                Log.e(TAG, "Found ${it?.size} static reference fields across # loaded DEX files")
-
-                makeAndPrintStaticInstanceTree(
-                    it!!
-                )
-             }
+            }
         } catch (t: Throwable) {
             Log.e(TAG, "lookup failed: ${t.message}", t)
             return emptyList()
         }
     }
 
-    fun makeStaticInstanceTree(staticFields: List<StaticField>): List<FlattenedPackage> {
+    fun makeStaticInstanceTree(staticFields: List<StaticField>): FlattenedPackage {
         val root = mutableMapOf<String, MutableList<StaticField>>()
 
         // Group static fields by their top-level package
@@ -104,6 +98,13 @@ object StaticFields {
 
         return root.mapNotNull { (packageName, fields) ->
             buildPackageTree(packageName, packageName, fields)
+        }.let {
+            // Create root node
+            FlattenedPackage(
+                name = "(root)",
+                packages = it,
+                staticFields = emptyList()
+            )
         }
     }
 
@@ -120,7 +121,7 @@ object StaticFields {
             }
         }
 
-        for (pkg in tree) {
+        for (pkg in tree.packages) {
             printPackage(pkg)
         }
     }

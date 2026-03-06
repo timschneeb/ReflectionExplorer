@@ -23,12 +23,17 @@ import me.timschneeberger.reflectionexplorer.databinding.FragmentInspectorBindin
 import me.timschneeberger.reflectionexplorer.model.InspectorViewModel
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
 import me.timschneeberger.reflectionexplorer.model.StaticClass
+import me.timschneeberger.reflectionexplorer.utils.ClassLoaderLocator
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showEditValueDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showErrorDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showMethodInvocationDialog
 import me.timschneeberger.reflectionexplorer.utils.castOrNull
+import me.timschneeberger.reflectionexplorer.utils.dex.FlattenedPackage
+import me.timschneeberger.reflectionexplorer.utils.dex.StaticField
 import me.timschneeberger.reflectionexplorer.utils.reflection.ClassHeaderInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.CollectionMember
+import me.timschneeberger.reflectionexplorer.utils.reflection.DexPackageItemInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.DexStaticFieldInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.ElementInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.MapEntryInfo
@@ -123,6 +128,25 @@ class InspectorFragment : Fragment() {
                 is ElementInfo -> activity?.openInspectorFor(member.value)
                 is MapEntryInfo -> activity?.openInspectorFor(member.value)
                 is ClassHeaderInfo -> { /* no-op: adapter handles expand/collapse */ }
+                is DexPackageItemInfo -> activity?.openInspectorFor(member.pkg)
+                is DexStaticFieldInfo -> {
+                    // Try to resolve the static field's runtime value and show it / open inspector
+                    try {
+                        activity?.let { ctx ->
+                            val cls = ClassLoaderLocator.findClassInProcess(
+                                ctx,
+                                member.staticField.declaringClass
+                            ) ?: throw Exception("Failed to resolve declaring class for static field")
+
+                            val value = getField(cls.getDeclaredField(member.staticField.name))
+                                ?: throw Exception("Field value is null")
+
+                            ctx.openInspectorFor(value)
+                        }
+                    } catch (e: Exception) {
+                        activity?.showErrorDialog(e)
+                    }
+                }
             }
         }
 
@@ -403,8 +427,11 @@ class InspectorFragment : Fragment() {
 
     private fun getInspectionTrailFromVm(mainVm: MainViewModel, instanceFallback: Any?): List<String> {
         val trail = mainVm.inspectionStack.map {
-            // Special case: handle static class wrapper
-            if (it is StaticClass && it.target != null) it.target.simpleName else it::class.java.simpleName
+            // Special case: handle wrappers
+            if (it is StaticClass) return@map it.target.simpleName
+            if (it is FlattenedPackage) return@map it.name
+            if (it is StaticField) return@map it.name
+            it::class.java.simpleName
         }
         return trail.ifEmpty { listOf(instanceFallback?.javaClass?.simpleName ?: "root") }
     }

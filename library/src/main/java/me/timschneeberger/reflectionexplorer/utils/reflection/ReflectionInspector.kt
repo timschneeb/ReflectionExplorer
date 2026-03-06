@@ -3,7 +3,8 @@ package me.timschneeberger.reflectionexplorer.utils.reflection
 import android.content.Context
 import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.model.StaticClass
-import java.lang.Number
+import me.timschneeberger.reflectionexplorer.utils.dex.FlattenedPackage
+import me.timschneeberger.reflectionexplorer.utils.dex.StaticField
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
@@ -84,11 +85,17 @@ class MapEntryInfo(name: String, val key: Any?, val value: Any?) : MemberInfo(na
 // Header that groups members declared on a particular class
 class ClassHeaderInfo(val cls: Class<*>) : MemberInfo(cls.simpleName)
 
+// Represents a package node item (clickable)
+class DexPackageItemInfo(val pkg: FlattenedPackage) : MemberInfo(pkg.name)
+// Represents a static field entry extracted from DEX
+class DexStaticFieldInfo(val staticField: StaticField) : MemberInfo(staticField.name)
+
 // Determine whether the given instance can be meaningfully inspected (is not a primitive wrapper or String)
 fun Any?.canInspectType(): Boolean =
     !(this != null && this::class.java.isPrimitive ||
-            this is java.lang.String || this is Number ||
-            this is java.lang.Boolean || this is Character)
+            this is String || this is Number ||
+            this is Boolean || this is Char)
+
 
 fun Any?.formatObject(ctx: Context, additionalTypeInfo: GettableMember?, withType: Boolean = true): String = try {
     var type = this?.javaClass?.simpleName ?: additionalTypeInfo?.getType(this ?: Any())?.simpleName ?: "Unknown"
@@ -155,11 +162,10 @@ fun Any?.invokeMethod(method: Method, args: Array<Any?> = emptyArray()): Any? {
 }
 
 fun Any.listMembers(): List<MemberInfo> {
+    val members = mutableListOf<MemberInfo>()
+
     // Special-case: our StaticClass wrapper to inspect static members of a target Class
     if (this is StaticClass) {
-        val target = this.target ?: return emptyList()
-        val members = mutableListOf<MemberInfo>()
-
         // Group declared static fields/methods by their declaring class along the superclass chain
         var current: Class<*>? = target
         while (current != null) {
@@ -181,8 +187,21 @@ fun Any.listMembers(): List<MemberInfo> {
         return members
     }
 
+    // Handle FlattenedPackage and StaticField tree instances (from DEX extraction)
+    if (this is FlattenedPackage) {
+        for (p in packages) members.add(DexPackageItemInfo(p))
+        for (sf in staticFields) members.add(DexStaticFieldInfo(sf))
+        return members.sortedBy { it.name }
+    }
+
+    // Also allow direct StaticField instances to expose a single entry (so inspector can show it)
+    if (this is StaticField) {
+        return listOf(DexStaticFieldInfo(this))
+    }
+
+    // ========= End of special cases ===========
+
     val cls = this::class.java
-    val members = mutableListOf<MemberInfo>()
 
     // If the instance itself is a Collection/Array/Map, expose elements as entries first
     if (this is Collection<*>) {

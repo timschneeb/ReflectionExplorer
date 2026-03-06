@@ -41,4 +41,7 @@
     <string name="class_inspect">Inspect class…</string>
     <string name="class_inspect_subtitle">Inspect any class statically</string>
     <string name="class_name_hint">Example: android.app.ActivityThread</string>
+    <string name="static_field_inspect">Find static fields…</string>
+    <string name="static_field_inspect_subtitle">Scan loaded code for static fields</string>
+    <string name="static_fields_scanning">Scanning...</string>
 </resources>

@@ -20,6 +20,7 @@ import me.timschneeberger.reflectionexplorer.fragment.InstancesFragment
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
 import me.timschneeberger.reflectionexplorer.model.StaticClass
 import me.timschneeberger.reflectionexplorer.utils.castOrNull
+import me.timschneeberger.reflectionexplorer.utils.dex.FlattenedPackage
 import me.timschneeberger.reflectionexplorer.utils.reflection.canInspectType
 import me.timschneeberger.reflectionexplorer.utils.reflection.listMembers
 
@@ -95,8 +96,11 @@ class ReflectionActivity : AppCompatActivity() {
             getString(
                 R.string.header_title,
                 // Special case: handle static class wrapper
-                if (top is StaticClass && top.target != null) top.target.simpleName
-                else top::class.java.simpleName,
+                when (top) {
+                    is StaticClass -> top.target.simpleName
+                    is FlattenedPackage -> top.name
+                    else -> top::class.java.simpleName
+                },
                 count)
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU){
             Process.myProcessName()

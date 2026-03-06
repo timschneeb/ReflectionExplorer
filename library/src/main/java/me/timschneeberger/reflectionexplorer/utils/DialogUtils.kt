@@ -3,7 +3,11 @@ package me.timschneeberger.reflectionexplorer.utils
 import android.content.Context
 import android.text.Editable
 import android.text.InputType
+import android.view.Gravity
 import android.view.LayoutInflater
+import android.view.ViewGroup
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.annotation.StringRes
 import androidx.appcompat.app.AlertDialog
@@ -19,6 +23,38 @@ import java.lang.reflect.Method
 import java.lang.reflect.Type
 
 object Dialogs {
+    fun Context.createProgressDialog(message: String): AlertDialog {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(24.dpToPx(), 16.dpToPx(), 24.dpToPx(), 16.dpToPx())
+            gravity = Gravity.CENTER_VERTICAL
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+        }
+
+        container.addView(
+            ProgressBar(this).apply {
+                isIndeterminate = true
+                layoutParams = LinearLayout.LayoutParams(40.dpToPx(), 40.dpToPx()) .apply {
+                    rightMargin = 16.dpToPx()
+                }
+            }
+        )
+        container.addView(
+            TextView(this).apply {
+                text = message
+                setTextAppearance(android.R.style.TextAppearance_Large)
+                layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT)
+            }
+        )
+
+        return MaterialAlertDialogBuilder(this)
+            .setTitle(null)
+            .setView(container)
+            .setCancelable(false)
+            .create()
+    }
+
+
     /**
      * Show a single-value edit dialog for arbitrary types.
      * callback: (success, parsedValue?, errorMessage?)

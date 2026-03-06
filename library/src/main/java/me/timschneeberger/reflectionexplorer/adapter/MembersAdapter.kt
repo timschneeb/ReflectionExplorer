@@ -9,27 +9,30 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.core.view.updateLayoutParams
 import androidx.recyclerview.widget.RecyclerView
+import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.ReflectionActivity
+import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
+import me.timschneeberger.reflectionexplorer.databinding.ItemMemberHeaderBinding
+import me.timschneeberger.reflectionexplorer.utils.ClassLoaderLocator
+import me.timschneeberger.reflectionexplorer.utils.Dialogs.showEditValueDialog
+import me.timschneeberger.reflectionexplorer.utils.Dialogs.showSetFieldDialog
+import me.timschneeberger.reflectionexplorer.utils.cast
+import me.timschneeberger.reflectionexplorer.utils.castOrNull
+import me.timschneeberger.reflectionexplorer.utils.dpToPx
+import me.timschneeberger.reflectionexplorer.utils.getFieldDrawable
+import me.timschneeberger.reflectionexplorer.utils.getMethodDrawable
 import me.timschneeberger.reflectionexplorer.utils.reflection.ClassHeaderInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.CollectionMember
+import me.timschneeberger.reflectionexplorer.utils.reflection.DexPackageItemInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.DexStaticFieldInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.ElementInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.MapEntryInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.MemberInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.MethodInfo
-import me.timschneeberger.reflectionexplorer.utils.reflection.CollectionMember
-import me.timschneeberger.reflectionexplorer.R
-import me.timschneeberger.reflectionexplorer.databinding.ItemMemberBinding
-import me.timschneeberger.reflectionexplorer.databinding.ItemMemberHeaderBinding
-import me.timschneeberger.reflectionexplorer.utils.Dialogs.showEditValueDialog
-import me.timschneeberger.reflectionexplorer.utils.Dialogs.showSetFieldDialog
-import me.timschneeberger.reflectionexplorer.utils.cast
-import me.timschneeberger.reflectionexplorer.utils.castOrNull
 import me.timschneeberger.reflectionexplorer.utils.reflection.ReflectionParser
-import me.timschneeberger.reflectionexplorer.utils.dpToPx
 import me.timschneeberger.reflectionexplorer.utils.reflection.formatObject
 import me.timschneeberger.reflectionexplorer.utils.reflection.getField
-import me.timschneeberger.reflectionexplorer.utils.getFieldDrawable
-import me.timschneeberger.reflectionexplorer.utils.getMethodDrawable
 
 class MembersAdapter(
     items: List<MemberInfo>,
@@ -49,6 +52,7 @@ class MembersAdapter(
     private fun activityOrNull(anchor: View): ReflectionActivity? =
         anchor.context.castOrNull<ReflectionActivity>()
 
+    // Packages are no longer headers; they are clickable members that navigate into nested packages
     override fun isHeader(item: MemberInfo): Boolean = item is ClassHeaderInfo
     override fun headerKey(item: MemberInfo): String = item.castOrNull<ClassHeaderInfo>()?.cls?.name ?: item.name
 
@@ -56,27 +60,30 @@ class MembersAdapter(
         if (viewType == TYPE_HEADER) HeaderVH(ItemMemberHeaderBinding.inflate(LayoutInflater.from(parent.context), parent, false))
         else VH(ItemMemberBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
+    @SuppressLint("NotifyDataSetChanged")
     override fun bindHeaderVH(holder: RecyclerView.ViewHolder, item: MemberInfo) {
         val hv = holder as HeaderVH
-        val header = item as ClassHeaderInfo
-        val pkg = header.cls.`package`?.name ?: "<default>"
-        val collapsed = collapsedClasses.contains(header.cls.name)
-        val count = fullItems.dropWhile { it !== item }.drop(1).takeWhile { it !is ClassHeaderInfo }.count()
+        if (item is ClassHeaderInfo) {
+            val pkg = item.cls.`package`?.name ?: "<default>"
+            val collapsed = collapsedClasses.contains(item.cls.name)
+            val count = fullItems.dropWhile { it !== item }.drop(1).takeWhile { it !is ClassHeaderInfo }.count()
 
-        hv.binding.apply {
-            headerChevron.rotation = if (collapsed) 90f else -90f
-            headerTitle.text = root.context.getString(R.string.header_title, header.cls.simpleName, count)
-            headerSubtitle.text = pkg
-            headerSubtitle.isVisible = headerSubtitle.text.isNotEmpty()
-            headerCard.updateLayoutParams<ViewGroup.MarginLayoutParams> { bottomMargin = if (collapsed) 0.dpToPx() else 7.dpToPx() }
-            root.setOnClickListener {
-                toggleHeaderCollapsed(item)
-                notifyDataSetChanged()
+            hv.binding.apply {
+                headerChevron.rotation = if (collapsed) 90f else -90f
+                headerTitle.text = root.context.getString(R.string.header_title, item.cls.simpleName, count)
+                headerSubtitle.text = pkg
+                headerSubtitle.isVisible = headerSubtitle.text.isNotEmpty()
+                headerCard.updateLayoutParams<ViewGroup.MarginLayoutParams> { bottomMargin = if (collapsed) 0.dpToPx() else 7.dpToPx() }
+                root.setOnClickListener {
+                    toggleHeaderCollapsed(item)
+                    notifyDataSetChanged()
+                }
             }
         }
 
     }
 
+    @SuppressLint("SetTextI18n")
     override fun bindItemVH(holder: RecyclerView.ViewHolder, item: MemberInfo) {
         val hv = holder as VH
         val position = visibleItems.indexOf(item)
@@ -88,6 +95,7 @@ class MembersAdapter(
             // Reset common state
             btnSet.isVisible = false
             btnDelete.isVisible = false
+            memberSubtitle.isVisible = true
 
             when (item) {
                 is FieldInfo -> {
@@ -125,7 +133,7 @@ class MembersAdapter(
                     btnSet.isVisible = ReflectionParser.canParseType(item.getType(rootInstance))
                     btnDelete.isVisible = rootInstance is Collection<*> || rootInstance.javaClass.isArray
 
-                    btnDelete.setOnClickListener { performDelete(activityOrNull(root)!!, item) }
+                    btnDelete.setOnClickListener { performDelete(item) }
                     btnSet.setOnClickListener { performEdit(activityOrNull(root)!!, item) }
                 }
 
@@ -139,8 +147,39 @@ class MembersAdapter(
                     btnDelete.isVisible = rootInstance is Map<*, *>
                     btnSet.isVisible = currentValue != null && ReflectionParser.canParseType(currentValue::class.java)
 
-                    btnDelete.setOnClickListener { performDelete(activityOrNull(root)!!, item) }
+                    btnDelete.setOnClickListener { performDelete(item) }
                     btnSet.setOnClickListener { performEdit(activityOrNull(root)!!, item) }
+                }
+
+                is DexStaticFieldInfo -> {
+                    memberTitle.text = item.name
+                    val sfAny = item.staticField
+                    memberSubtitle.text = sfAny.refType + if (sfAny.isArray) "[]" else ""
+                    memberIcon.setImageResource(R.drawable.ic_field)
+
+                    val cls = ClassLoaderLocator.findClassInProcess(
+                        holder.binding.root.context,
+                        sfAny.declaringClass
+                    )
+
+                    if (cls == null)
+                        memberSubtitle.text  = "Failed to resolve class ${sfAny.declaringClass}"
+                    else {
+                        try {
+                            if(getField(cls.getDeclaredField(sfAny.name)) == null) {
+                                memberSubtitle.text = "NULL " + memberSubtitle.text
+                            }
+                        } catch (e: Exception) {
+                            root.context.getString(R.string.error_prefix, e)
+                        }
+                    }
+                }
+                is DexPackageItemInfo -> {
+                    memberTitle.text = item.name
+                    memberSubtitle.isVisible = false
+                    memberIcon.setImageResource(R.drawable.ic_java_package)
+                    btnSet.isVisible = false
+                    btnDelete.isVisible = false
                 }
 
                 else -> {
@@ -161,7 +200,7 @@ class MembersAdapter(
         }
 
         val out = mutableListOf<MemberInfo>()
-        var currentHeader: ClassHeaderInfo? = null
+        var currentHeader: MemberInfo? = null
         var buffer = mutableListOf<MemberInfo>()
 
         fun flushBuffer() {
@@ -198,7 +237,7 @@ class MembersAdapter(
     }
 
     // Helpers to mutate collection/map elements via ReflectionInspector
-    private fun performDelete(activity: ReflectionActivity, item: MemberInfo) {
+    private fun performDelete(item: MemberInfo) {
         if (item is CollectionMember) {
             val newRoot = item.applyDelete(rootInstance)
             if (newRoot != null) onRequestReplaceStackAt(stackIndex, newRoot)
