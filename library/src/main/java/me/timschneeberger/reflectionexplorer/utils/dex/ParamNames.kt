@@ -2,15 +2,9 @@ package me.timschneeberger.reflectionexplorer.utils.dex
 
 import android.content.Context
 import android.util.Log
-import org.jf.dexlib2.Opcodes
 import org.jf.dexlib2.dexbacked.DexBackedDexFile
-import java.io.BufferedInputStream
-import java.io.File
-import java.io.FileInputStream
-import java.io.InputStream
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
-import java.util.zip.ZipFile
 
 /**
  * Small helper to obtain parameter names from DEX files using dexlib2, with caching.
@@ -19,92 +13,33 @@ object ParamNames {
     private const val TAG = "ParamNames"
 
     private val cache: ConcurrentHashMap<Method, Array<String>> = ConcurrentHashMap()
-    val additionalDexSearchPaths = mutableListOf<String>()
 
     /**
      * Returns parameter names for [method] or null if not found.
      */
-    fun lookup(context: Context, method: Method): Array<String>? {
-        val arr = cache.computeIfAbsent(method) {
-            val dexPaths = DexLocator.findLoadedPaths(context, additionalDexSearchPaths)?.filter {
-                // Skip resource-only APKs
-                !it.contains("/overlay/") &&
-                !it.startsWith("/data/resource-cache/") &&
-                it != "/system/framework/framework-res.apk"
-            }
+    fun lookup(context: Context, method: Method): Array<String> = cache.computeIfAbsent(method) {
+        try {
+            val klassDescriptor = "L${method.declaringClass.name.replace('.', '/')};"
+            val methodName = method.name
+            val paramCount = method.parameterCount
 
-            try {
-                lookupFromDex(dexPaths?.toTypedArray(), method) ?: emptyArray()
-            } catch (t: Throwable) {
-                Log.w(TAG, "lookup failed for ${method.declaringClass.name}.${method.name}: ${t.message}", t)
-                emptyArray()
-            }
-        }
-        return if (arr.isEmpty()) null else arr
-    }
-
-    /**
-     * Read DEX/APK files and extract parameter names using dexlib2.
-     */
-    private fun lookupFromDex(paths: Array<String>?, method: Method): Array<String>? {
-        val cls = method.declaringClass
-        if (paths.isNullOrEmpty()) return null
-
-        val klassDescriptor = "L${cls.name.replace('.', '/')};"
-        val methodName = method.name
-        val paramCount = method.parameterCount
-
-        for (p in paths) {
-            val f = File(p)
-            if (!f.exists()) continue
-            // If file is .dex, parse it directly
-            if (f.extension.equals("dex", ignoreCase = true)) {
-                parseDexFileForMethod(f, klassDescriptor, methodName, paramCount)?.let { return it }
-                continue
-            }
-            // If file is archive (.apk/.jar/.zip), scan for classes*.dex
-            if (f.extension.equals("apk", true) || f.extension.equals("jar", true) || f.extension.equals("zip", true)) {
-                try {
-                    ZipFile(f).use { zip ->
-                        val entries = zip.entries()
-                        while (entries.hasMoreElements()) {
-                            val ze = entries.nextElement()
-                            val name = ze.name
-                            if (!name.startsWith("classes") || !name.endsWith(".dex")) continue
-                            zip.getInputStream(ze).use { ins ->
-                                val bis = if (ins.markSupported()) ins else BufferedInputStream(ins)
-                                try {
-                                    parseDexStreamForMethod(bis, klassDescriptor, methodName, paramCount)?.let { return it }
-                                } catch (t: Throwable) {
-                                    Log.w(TAG, "Failed to parse dex entry $name in ${f.absolutePath}: ${t.message}", t)
-                                }
-                            }
-                        }
+            DexLocator.findLoadedPaths(context)?.forEach {
+                for(dex in DexLocator.openPackage(it)) {
+                    parseDexForMethod(dex, klassDescriptor, methodName, paramCount)?.let { names ->
+                        return@computeIfAbsent names
                     }
-                } catch (t: Throwable) {
-                    Log.w(TAG, "Failed to inspect archive ${f.absolutePath}: ${t.message}", t)
                 }
             }
-        }
-        return null
-    }
-
-    private fun parseDexFileForMethod(file: File, klassDescriptor: String, methodName: String, paramCount: Int): Array<String>? {
-        try {
-            FileInputStream(file).use { fis ->
-                val bis = if (fis.markSupported()) fis else BufferedInputStream(fis)
-                return parseDexStreamForMethod(bis, klassDescriptor, methodName, paramCount)
-            }
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to parse dex file ${file.absolutePath}: ${t.message}", t)
-            return null
+            Log.w(TAG, "lookup failed for ${method.declaringClass.name}.${method.name}: ${t.message}", t)
         }
+
+        return@computeIfAbsent emptyArray()
     }
 
-    private fun parseDexStreamForMethod(input: InputStream, klassDescriptor: String, methodName: String, paramCount: Int): Array<String>? {
+    private fun parseDexForMethod(dex: DexBackedDexFile, klassDescriptor: String, methodName: String, paramCount: Int): Array<String>? {
         var methodSignatureFound = false
         try {
-            val dex = DexBackedDexFile.fromInputStream(Opcodes.getDefault(), input)
             for (dexClass in dex.classes) {
                 if (dexClass.type != klassDescriptor) continue
                 if (methodSignatureFound) {
@@ -132,7 +67,7 @@ object ParamNames {
             Log.e(TAG, "dexlib2 parse error: ${t.message}", t)
         }
 
-        // If method signature was found but parameter names are missing/incomplete, generate new names
+        // If parameter names are missing/incomplete, generate new names
         if (methodSignatureFound) {
             return Array(paramCount) { idx -> "param$idx" }
         }
