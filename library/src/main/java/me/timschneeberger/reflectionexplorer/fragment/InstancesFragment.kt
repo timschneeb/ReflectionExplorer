@@ -25,6 +25,7 @@ import me.timschneeberger.reflectionexplorer.model.Shortcut
 import me.timschneeberger.reflectionexplorer.model.StaticClass
 import me.timschneeberger.reflectionexplorer.utils.ClassLoaderLocator
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.createProgressDialog
+import me.timschneeberger.reflectionexplorer.utils.Dialogs.showConfirmDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showErrorDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showInputAlert
 import me.timschneeberger.reflectionexplorer.utils.cast
@@ -116,24 +117,31 @@ class InstancesFragment : Fragment() {
         val ctx = activity ?: return
         val progressDialog = ctx.createProgressDialog(getString(R.string.static_fields_scanning))
 
-        progressDialog.show()
-        Thread {
-            try {
-                val data = StaticFields.lookup(ctx) ?: throw Exception("Error during lookup")
-                val tree = StaticFields.makeStaticInstanceTree(data)
-                ctx.runOnUiThread {
-                    progressDialog.dismiss()
-                    activity
-                        ?.cast<ReflectionActivity>()
-                        ?.handleInstanceSelected(tree)
+        ctx.showConfirmDialog(
+            getString(R.string.static_fields_include_framework_title),
+            getString(R.string.static_fields_include_framework),
+            getString(R.string.yes),
+            getString(R.string.no)
+        ) { includeFramework ->
+            progressDialog.show()
+            Thread {
+                try {
+                    val data = StaticFields.lookup(ctx, includeFramework) ?: throw Exception("Error during lookup")
+                    val tree = StaticFields.makeStaticInstanceTree(data)
+                    ctx.runOnUiThread {
+                        progressDialog.dismiss()
+                        activity
+                            ?.cast<ReflectionActivity>()
+                            ?.handleInstanceSelected(tree)
+                    }
+                } catch (e: Exception) {
+                    ctx.runOnUiThread {
+                        progressDialog.dismiss()
+                        ctx.showErrorDialog(e)
+                    }
                 }
-            } catch (e: Exception) {
-                ctx.runOnUiThread {
-                    progressDialog.dismiss()
-                    ctx.showErrorDialog(e)
-                }
-            }
-        }.start()
+            }.start()
+        }
     }
 
     private fun showClassInputDialog() {

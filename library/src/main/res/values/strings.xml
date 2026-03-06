@@ -18,6 +18,9 @@
 
     <string name="ok">OK</string>
     <string name="cancel">Cancel</string>
+    <string name="yes">Yes</string>
+    <string name="no">No</string>
+
     <string name="set_field_title">Set %1$s</string>
     <string name="set_field_hint">New value for %1$s (%2$s)</string>
     <string name="invoke_title">Invoke %1$s</string>
@@ -43,5 +46,7 @@
     <string name="class_name_hint">Example: android.app.ActivityThread</string>
     <string name="static_field_inspect">Find static fields…</string>
     <string name="static_field_inspect_subtitle">Scan loaded code for static fields</string>
-    <string name="static_fields_scanning">Scanning...</string>
+    <string name="static_fields_scanning">Scanning…</string>
+    <string name="static_fields_include_framework_title">Include framework classes?</string>
+    <string name="static_fields_include_framework">Do you want to include static field definitions from Android\'s framework.jar in the scan?</string>
 </resources>

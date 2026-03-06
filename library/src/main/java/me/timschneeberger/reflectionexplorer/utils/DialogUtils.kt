@@ -127,6 +127,21 @@ object Dialogs {
             .show()
     }
 
+    fun Context.showConfirmDialog(
+        title: String,
+        message: String,
+        yesText: String = getString(android.R.string.ok),
+        noText: String = getString(android.R.string.cancel),
+        onResult: (Boolean) -> Unit
+    ) {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(title)
+            .setMessage(message)
+            .setPositiveButton(yesText) { _, _ -> onResult(true) }
+            .setNegativeButton(noText) { _, _ -> onResult(false) }
+            .show()
+    }
+
 
     fun Context.showInputAlert(
         layoutInflater: LayoutInflater,

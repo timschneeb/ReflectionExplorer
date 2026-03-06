@@ -22,10 +22,15 @@ object StaticFields {
         ".protobuf."
     )
 
-    fun lookup(context: Context): List<StaticField>? {
+    fun lookup(context: Context, includeFramework: Boolean): List<StaticField>? {
         return try {
              DexLocator.findLoadedPaths(context)?.flatMap { path ->
-                DexLocator.openPackage(path).flatMap { dex ->
+                 if (!includeFramework && path == "/system/framework/framework.jar") {
+                     return@flatMap emptySequence()
+                 }
+
+                 Log.i(TAG, "Scanning $path for static fields...")
+                 DexLocator.openPackage(path).flatMap { dex ->
                     dex.classes
                         .flatMap { cls ->
                             cls.staticFields
