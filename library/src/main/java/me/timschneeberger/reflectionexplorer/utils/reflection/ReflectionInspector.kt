@@ -90,6 +90,9 @@ class DexPackageItemInfo(val pkg: FlattenedPackage) : MemberInfo(pkg.name)
 // Represents a static field entry extracted from DEX
 class DexStaticFieldInfo(val staticField: StaticField) : MemberInfo(staticField.name)
 
+// Represents a grouped type that contains multiple static fields
+class DexTypeGroupInfo(typeFullName: String, val fields: List<StaticField>) : MemberInfo(typeFullName)
+
 // Determine whether the given instance can be meaningfully inspected (is not a primitive wrapper or String)
 fun Any?.canInspectType(): Boolean =
     !(this != null && this::class.java.isPrimitive ||
@@ -189,8 +192,26 @@ fun Any.listMembers(): List<MemberInfo> {
 
     // Handle FlattenedPackage and StaticField tree instances (from DEX extraction)
     if (this is FlattenedPackage) {
+        // add direct subpackages
         for (p in packages) members.add(DexPackageItemInfo(p))
-        for (sf in staticFields) members.add(DexStaticFieldInfo(sf))
+
+        val groupedByType = staticFields.groupBy { it.refType }
+
+        // For the current package, expose type-group entries whose type package matches this package.
+        val groupedTypesShown = mutableSetOf<String>()
+        for ((typeFull, list) in groupedByType) {
+            val typePkg = typeFull.substringBeforeLast('.')
+            if (typePkg == name || typePkg.endsWith(".$name") || name.endsWith(".$typePkg")) {
+                members.add(DexTypeGroupInfo(typeFull, list))
+                groupedTypesShown.add(typeFull)
+            }
+        }
+
+        // Add leftover fields; shouldn't happen normally
+        for (sf in staticFields) {
+            if (!groupedTypesShown.contains(sf.refType)) members.add(DexStaticFieldInfo(sf))
+        }
+
         return members.sortedBy { it.name }
     }
 
@@ -235,6 +256,11 @@ fun Any.listMembers(): List<MemberInfo> {
             // include java.lang.Object members optionally? skip to avoid noise
             break
         }
+    }
+
+    // If inspecting a DexTypeGroupInfo, list all matching static fields as DexStaticFieldInfo entries
+    if (this is DexTypeGroupInfo) {
+        return this.fields.map { sf -> DexStaticFieldInfo(sf) }.sortedBy { it.name }
     }
 
     return members

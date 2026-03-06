@@ -34,6 +34,7 @@ import me.timschneeberger.reflectionexplorer.utils.reflection.ClassHeaderInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.CollectionMember
 import me.timschneeberger.reflectionexplorer.utils.reflection.DexPackageItemInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.DexStaticFieldInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.DexTypeGroupInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.ElementInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.MapEntryInfo
@@ -147,6 +148,7 @@ class InspectorFragment : Fragment() {
                         activity?.showErrorDialog(e)
                     }
                 }
+                is DexTypeGroupInfo -> activity?.openInspectorFor(member)
             }
         }
 

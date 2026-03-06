@@ -25,6 +25,7 @@ import me.timschneeberger.reflectionexplorer.utils.reflection.ClassHeaderInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.CollectionMember
 import me.timschneeberger.reflectionexplorer.utils.reflection.DexPackageItemInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.DexStaticFieldInfo
+import me.timschneeberger.reflectionexplorer.utils.reflection.DexTypeGroupInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.ElementInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.FieldInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.MapEntryInfo
@@ -152,9 +153,9 @@ class MembersAdapter(
                 }
 
                 is DexStaticFieldInfo -> {
-                    memberTitle.text = item.name
                     val sfAny = item.staticField
-                    memberSubtitle.text = sfAny.refType + if (sfAny.isArray) "[]" else ""
+                    memberTitle.text = item.name + if (sfAny.isArray) "[]" else ""
+                    memberSubtitle.text = sfAny.declaringClass
                     memberIcon.setImageResource(R.drawable.ic_field)
 
                     val cls = ClassLoaderLocator.findClassInProcess(
@@ -173,6 +174,13 @@ class MembersAdapter(
                             root.context.getString(R.string.error_prefix, e)
                         }
                     }
+                }
+                is DexTypeGroupInfo -> {
+                    memberTitle.text = item.name
+                    memberSubtitle.text = root.context.getString(R.string.collection_size, item.fields.size)
+                    memberIcon.setImageResource(R.drawable.ic_class)
+                    btnSet.isVisible = false
+                    btnDelete.isVisible = false
                 }
                 is DexPackageItemInfo -> {
                     memberTitle.text = item.name
