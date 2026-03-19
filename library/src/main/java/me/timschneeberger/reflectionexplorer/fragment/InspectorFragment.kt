@@ -28,8 +28,8 @@ import me.timschneeberger.reflectionexplorer.utils.Dialogs.showEditValueDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showErrorDialog
 import me.timschneeberger.reflectionexplorer.utils.Dialogs.showMethodInvocationDialog
 import me.timschneeberger.reflectionexplorer.utils.castOrNull
-import me.timschneeberger.reflectionexplorer.utils.dex.FlattenedPackage
-import me.timschneeberger.reflectionexplorer.utils.dex.StaticField
+import me.timschneeberger.reflectionexplorer.utils.dex.model.FlattenedPackage
+import me.timschneeberger.reflectionexplorer.utils.dex.model.StaticField
 import me.timschneeberger.reflectionexplorer.utils.reflection.ClassHeaderInfo
 import me.timschneeberger.reflectionexplorer.utils.reflection.CollectionMember
 import me.timschneeberger.reflectionexplorer.utils.reflection.DexPackageItemInfo

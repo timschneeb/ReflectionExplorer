@@ -3,8 +3,8 @@ package me.timschneeberger.reflectionexplorer.utils.reflection
 import android.content.Context
 import me.timschneeberger.reflectionexplorer.R
 import me.timschneeberger.reflectionexplorer.model.StaticClass
-import me.timschneeberger.reflectionexplorer.utils.dex.FlattenedPackage
-import me.timschneeberger.reflectionexplorer.utils.dex.StaticField
+import me.timschneeberger.reflectionexplorer.utils.dex.model.FlattenedPackage
+import me.timschneeberger.reflectionexplorer.utils.dex.model.StaticField
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier

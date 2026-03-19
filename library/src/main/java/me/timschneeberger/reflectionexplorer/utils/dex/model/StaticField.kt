@@ -1,4 +1,4 @@
-package me.timschneeberger.reflectionexplorer.utils.dex
+package me.timschneeberger.reflectionexplorer.utils.dex.model
 
 import org.jf.dexlib2.dexbacked.DexBackedField
 

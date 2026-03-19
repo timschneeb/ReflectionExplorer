@@ -2,6 +2,8 @@ package me.timschneeberger.reflectionexplorer.utils.dex
 
 import android.content.Context
 import android.util.Log
+import me.timschneeberger.reflectionexplorer.utils.dex.model.FlattenedPackage
+import me.timschneeberger.reflectionexplorer.utils.dex.model.StaticField
 import org.jf.dexlib2.AccessFlags
 
 /**

@@ -20,7 +20,7 @@ import me.timschneeberger.reflectionexplorer.fragment.InstancesFragment
 import me.timschneeberger.reflectionexplorer.model.MainViewModel
 import me.timschneeberger.reflectionexplorer.model.StaticClass
 import me.timschneeberger.reflectionexplorer.utils.castOrNull
-import me.timschneeberger.reflectionexplorer.utils.dex.FlattenedPackage
+import me.timschneeberger.reflectionexplorer.utils.dex.model.FlattenedPackage
 import me.timschneeberger.reflectionexplorer.utils.reflection.canInspectType
 import me.timschneeberger.reflectionexplorer.utils.reflection.listMembers
 
