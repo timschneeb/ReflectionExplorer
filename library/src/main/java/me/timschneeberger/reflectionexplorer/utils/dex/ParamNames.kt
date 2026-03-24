@@ -10,8 +10,6 @@ import java.util.concurrent.ConcurrentHashMap
  * Small helper to obtain parameter names from DEX files using dexlib2, with caching.
  */
 object ParamNames {
-    private const val TAG = "ParamNames"
-
     private val cache: ConcurrentHashMap<Method, Array<String>> = ConcurrentHashMap()
 
     /**

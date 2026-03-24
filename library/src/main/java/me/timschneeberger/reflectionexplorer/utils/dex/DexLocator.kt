@@ -13,8 +13,6 @@ import java.io.FileInputStream
 import java.util.zip.ZipFile
 
 object DexLocator {
-    const val TAG = "DexLocator"
-
     val additionalDexSearchPaths = mutableListOf<String>()
 
     /**

@@ -10,8 +10,6 @@ import timber.log.Timber
  * Small helper to static field info from DEX files using dexlib2.
  */
 object StaticFields {
-    private const val TAG = "StaticFields"
-
     private val hiddenFieldTypePrefixes = setOf(
         "java.",
         "kotlin.",
