@@ -2,11 +2,11 @@ package me.timschneeberger.reflectionexplorer.utils.dex
 
 import android.annotation.SuppressLint
 import android.content.Context
-import android.util.Log
 import dalvik.system.BaseDexClassLoader
 import me.timschneeberger.reflectionexplorer.utils.ClassLoaderLocator
 import org.jf.dexlib2.Opcodes
 import org.jf.dexlib2.dexbacked.DexBackedDexFile
+import timber.log.Timber
 import java.io.BufferedInputStream
 import java.io.File
 import java.io.FileInputStream
@@ -23,12 +23,12 @@ object DexLocator {
     fun findLoadedPaths(context: Context): Array<String>? = try {
         locateDexFromContext(context)
     } catch (t: Throwable) {
-        Log.w(TAG, "locateDexFromContext failed: ${t.message}", t)
+        Timber.w(t, "locateDexFromContext failed: ${t.message}")
 
         try {
             locateDexFromMemoryMap()
         } catch (t: Throwable) {
-            Log.w(TAG, "locateDexFromMemoryMap failed: ${t.message}", t)
+            Timber.w(t, "locateDexFromMemoryMap failed: ${t.message}")
             null
         }
     }?.let {
@@ -54,7 +54,7 @@ object DexLocator {
             val zip = try {
                 ZipFile(f)
             } catch (t: Throwable) {
-                Log.e(TAG, "Failed to inspect archive ${f.absolutePath}: ${t.message}", t)
+                Timber.e(t, "Failed to inspect archive ${f.absolutePath}: ${t.message}")
                 null
             }
 
@@ -123,7 +123,7 @@ object DexLocator {
                 }
             }
         } catch (t: Throwable) {
-            Log.e(TAG, "Failed to read /proc/self/maps: ${t.message}", t)
+            Timber.e(t, "Failed to read /proc/self/maps: ${t.message}")
         }
         return result.distinct().toTypedArray()
     }

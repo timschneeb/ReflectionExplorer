@@ -41,6 +41,7 @@ dependencies {
     implementation(libs.androidx.recyclerview)
     implementation(libs.dexlib2)
     implementation(libs.ezxhelper.core)
+    implementation(libs.timber)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

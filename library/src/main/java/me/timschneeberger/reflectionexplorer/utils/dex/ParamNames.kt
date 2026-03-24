@@ -1,8 +1,8 @@
 package me.timschneeberger.reflectionexplorer.utils.dex
 
 import android.content.Context
-import android.util.Log
 import org.jf.dexlib2.dexbacked.DexBackedDexFile
+import timber.log.Timber
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
 
@@ -31,7 +31,7 @@ object ParamNames {
                 }
             }
         } catch (t: Throwable) {
-            Log.w(TAG, "lookup failed for ${method.declaringClass.name}.${method.name}: ${t.message}", t)
+            Timber.w(t, "lookup failed for ${method.declaringClass.name}.${method.name}: ${t.message}")
         }
 
         return@computeIfAbsent emptyArray()
@@ -59,12 +59,12 @@ object ParamNames {
                             return names.toTypedArray()
                         }
                     } catch (t: Throwable) {
-                        Log.e(TAG, "Failed to read parameters for method $methodName in $klassDescriptor: ${t.message}", t)
+                        Timber.e(t, "Failed to read parameters for method $methodName in $klassDescriptor: ${t.message}")
                     }
                 }
             }
         } catch (t: Throwable) {
-            Log.e(TAG, "dexlib2 parse error: ${t.message}", t)
+            Timber.e(t, "dexlib2 parse error: ${t.message}")
         }
 
         // If parameter names are missing/incomplete, generate new names

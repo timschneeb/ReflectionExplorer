@@ -1,10 +1,10 @@
 package me.timschneeberger.reflectionexplorer.utils.dex
 
 import android.content.Context
-import android.util.Log
 import me.timschneeberger.reflectionexplorer.utils.dex.model.FlattenedPackage
 import me.timschneeberger.reflectionexplorer.utils.dex.model.StaticField
 import org.jf.dexlib2.AccessFlags
+import timber.log.Timber
 
 /**
  * Small helper to static field info from DEX files using dexlib2.
@@ -26,10 +26,9 @@ object StaticFields {
 
     fun lookup(context: Context, includeFramework: Boolean): List<StaticField>? {
         return try {
-            Log.e(TAG, context.applicationInfo.sourceDir)
              DexLocator.findLoadedPaths(context)?.flatMap { path ->
                  if (path.contains("/${context.packageName}-")) {
-                     Log.d(TAG, "Skipping app's own APK at $path")
+                     Timber.d("Skipping app's own APK at $path")
                      return@flatMap emptySequence()
                  }
 
@@ -37,7 +36,7 @@ object StaticFields {
                      return@flatMap emptySequence()
                  }
 
-                 Log.i(TAG, "Scanning $path for static fields...")
+                 Timber.i("Scanning $path for static fields...")
                  DexLocator.openPackage(path).flatMap { dex ->
                     dex.classes
                         .flatMap { cls ->
@@ -58,7 +57,7 @@ object StaticFields {
                 }
             }
         } catch (t: Throwable) {
-            Log.e(TAG, "lookup failed: ${t.message}", t)
+            Timber.e(t, "lookup failed: ${t.message}")
             return emptyList()
         }
     }
@@ -125,9 +124,9 @@ object StaticFields {
         val tree = makeStaticInstanceTree(staticFields)
 
         fun printPackage(pkg: FlattenedPackage, indent: String = "") {
-            Log.e(TAG, "$indent- ${pkg.name} (${pkg.staticFields.size} static fields)")
+            Timber.e("$indent- ${pkg.name} (${pkg.staticFields.size} static fields)")
             for (field in pkg.staticFields.take(3)) {
-                Log.e(TAG, "$indent  - ${field.name}: ${field.refType}${if (field.isArray) "[]" else ""}")
+                Timber.e("$indent  - ${field.name}: ${field.refType}${if (field.isArray) "[]" else ""}")
             }
             for (subPkg in pkg.packages) {
                 printPackage(subPkg, "$indent  ")

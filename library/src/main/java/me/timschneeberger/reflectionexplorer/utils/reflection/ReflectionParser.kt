@@ -1,6 +1,6 @@
 package me.timschneeberger.reflectionexplorer.utils.reflection
 
-import android.util.Log
+import timber.log.Timber
 import java.lang.reflect.ParameterizedType
 import java.lang.reflect.Type
 import java.util.Collection
@@ -102,7 +102,7 @@ object ReflectionParser {
             if (Map::class.java.isAssignableFrom(type)) return parseMapValue()
         }
         catch (e: Exception) {
-            Log.e("ReflectionParser", "Failed to parse value '$text' for type ${type.name}: ${e.message}", e)
+            Timber.e(e, "Failed to parse value '$text' for type ${type.name}: ${e.message}")
             return "<error>"
         }
 
