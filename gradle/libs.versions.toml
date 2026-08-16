@@ -17,6 +17,12 @@ annotationJvm = "1.9.1"
 timber = "5.0.1"
 
 [libraries]
+agp-apksig = { group = "com.android.tools.build", name = "apksig", version.ref = "agp" }
+kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version = "1.11.0" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version = "1.11.0" }
+gson = { module = "com.google.code.gson:gson", version = "2.14.0" }
+picocli = { module = "info.picocli:picocli", version = "4.7.7" }
+rikkax-parcelablelist = { module = "dev.rikka.rikkax.parcelablelist:parcelablelist", version = "2.0.1" }
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 androidx-recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerview" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
